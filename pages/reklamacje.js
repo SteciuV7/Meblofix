@@ -492,7 +492,7 @@ export default function Reklamacje() {
               <tr className="border-b">
                 <th className="p-2 text-left">Nr</th>
                 <th className="p-2 text-left">Firma</th>
-                <th className="p-2 text-left">Faktura</th>
+                <th className="p-2 text-left">Nr reklamacji</th>
                 <th className="p-2 text-left">Kod pocztowy</th>
                 <th className="p-2 text-left">Miejscowość</th>
                 <th className="p-2 text-left">Opis</th>
@@ -763,9 +763,9 @@ export default function Reklamacje() {
                       </option>
                     ))}
                 </select>
-                <label className="font-semibold">Numer faktury</label>
+                <label className="font-semibold">Numer reklamacji</label>
                 <input
-                  placeholder="Numer faktury"
+                  placeholder="Numer Reklamacji"
                   className="border p-2 w-full mb-2"
                   value={newReklamacja.numer_faktury}
                   onChange={(e) =>
@@ -992,7 +992,7 @@ export default function Reklamacje() {
                   <strong>Nazwa firmy:</strong> {selectedReklamacja.nazwa_firmy}
                 </p>
                 <p>
-                  <strong>Numer faktury:</strong>{" "}
+                  <strong>Numer reklamacji:</strong>{" "}
                   {selectedReklamacja.numer_faktury}
                 </p>
                 <p>
@@ -1127,7 +1127,7 @@ export default function Reklamacje() {
                   }
                 />
 
-                <label className="font-semibold">Numer faktury</label>
+                <label className="font-semibold">Numer Reklamacji</label>
                 <input
                   type="text"
                   className="border p-2 w-full mb-2"

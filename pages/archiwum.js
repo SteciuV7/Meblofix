@@ -451,7 +451,7 @@ export default function Reklamacje() {
               <tr className="border-b">
                 <th className="p-2 text-left">Nr</th>
                 <th className="p-2 text-left">Firma</th>
-                <th className="p-2 text-left">Faktura</th>
+                <th className="p-2 text-left">Nr reklamacji</th>
                 <th className="p-2 text-left">Kod pocztowy</th>
                 <th className="p-2 text-left">Miejscowość</th>
                 <th className="p-2 text-left">Opis</th>

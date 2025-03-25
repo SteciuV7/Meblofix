@@ -49,6 +49,31 @@ export default function Reklamacje() {
   const [opisPrzebiegu, setOpisPrzebiegu] = useState("");
   const [closeImageFiles, setCloseImageFiles] = useState([]);
   const [closeImagePreviews, setCloseImagePreviews] = useState([]);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [statusToUpdate, setStatusToUpdate] = useState(null);
+  const handleEditStatus = (reklamacja) => {
+    setStatusToUpdate(reklamacja);
+    setIsStatusModalOpen(true);
+  };
+  const updateStatus = async (newStatus) => {
+    try {
+      const { error } = await supabase
+        .from("reklamacje")
+        .update({ status: newStatus })
+        .eq("id", statusToUpdate.id);
+
+      if (error) {
+        alert(`Błąd aktualizacji statusu: ${error.message}`);
+        return;
+      }
+
+      alert("✅ Status zaktualizowany!");
+      setIsStatusModalOpen(false);
+      location.reload();
+    } catch (error) {
+      alert(`Błąd: ${error.message}`);
+    }
+  };
 
   function calculateRemainingTime(targetDate) {
     const currentDate = new Date();
@@ -65,7 +90,13 @@ export default function Reklamacje() {
     setZoomedImage(null);
   }
 
-  function FileUploader({ onFileSelect, fileType, label, filePreview }) {
+  function FileUploader({
+    onFileSelect,
+    fileType,
+    label,
+    filePreview,
+    onRemove,
+  }) {
     const { getRootProps, getInputProps } = useDropzone({
       accept: fileType,
       maxSize: 2 * 1024 * 1024, // Maks. 2MB
@@ -81,32 +112,44 @@ export default function Reklamacje() {
     return (
       <div
         {...getRootProps()}
-        className="border-dashed border-2 border-gray-300 p-6 text-center cursor-pointer relative"
+        className="relative border-dashed border-2 border-gray-300 p-6 text-center cursor-pointer"
       >
         <input {...getInputProps()} />
         {filePreview ? (
-          <div className="flex flex-col items-center">
-            {fileType.includes("image") ? (
-              <Image
-                src={filePreview}
-                alt="Podgląd"
-                width={64} // Możesz dostosować szerokość
-                height={64} // Możesz dostosować wysokość
-                className="h-16 w-16 object-cover mb-2 rounded"
-                unoptimized
-              />
-            ) : (
-              <a
-                href={filePreview}
-                target="_blank"
-                className="text-blue-500 underline"
-              >
-                PDF (Podgląd)
-              </a>
-            )}
-            <p className="text-gray-700 text-sm truncate w-32">
-              {filePreview.split("/").pop()}
-            </p>
+          <div className="relative">
+            <div className="flex flex-col items-center">
+              {fileType.includes("image") ? (
+                <Image
+                  src={filePreview}
+                  alt="Podgląd"
+                  width={64}
+                  height={64}
+                  className="h-16 w-16 object-cover mb-2 rounded"
+                  unoptimized
+                />
+              ) : (
+                <a
+                  href={filePreview}
+                  target="_blank"
+                  className="text-blue-500 underline"
+                >
+                  PDF (Podgląd)
+                </a>
+              )}
+              <p className="text-gray-700 text-sm truncate w-32">
+                {filePreview.split("/").pop()}
+              </p>
+            </div>
+            {/* Przycisk usuwania */}
+            <button
+              className="absolute top-0 right-0 bg-red-500 text-white px-2 py-1 rounded"
+              onClick={(e) => {
+                e.stopPropagation(); // Zapobiega otwieraniu dialogu
+                onRemove();
+              }}
+            >
+              ✕
+            </button>
           </div>
         ) : (
           <div>
@@ -167,6 +210,33 @@ export default function Reklamacje() {
     }
   }
 
+  function removePolishCharacters(text) {
+    const polishMap = {
+      ą: "a",
+      ć: "c",
+      ę: "e",
+      ł: "l",
+      ń: "n",
+      ó: "o",
+      ś: "s",
+      ż: "z",
+      ź: "z",
+      Ą: "A",
+      Ć: "C",
+      Ę: "E",
+      Ł: "L",
+      Ń: "N",
+      Ó: "O",
+      Ś: "S",
+      Ż: "Z",
+      Ź: "Z",
+    };
+    return text.replace(
+      /[ąćęłńóśżźĄĆĘŁŃÓŚŻŹ]/g,
+      (char) => polishMap[char] || char
+    );
+  }
+
   async function uploadFile(file, folder) {
     try {
       console.log("Rozpoczynanie uploadu pliku:", file.name);
@@ -176,10 +246,16 @@ export default function Reklamacje() {
         file = await compressImage(file);
       }
 
-      const filePath = `${folder}/${Date.now()}-${file.name}`;
+      // Usunięcie polskich znaków z nazwy pliku
+      const cleanedFileName = removePolishCharacters(file.name);
+      const filePath = `${folder}/${Date.now()}-${cleanedFileName}`;
+
       const { data, error } = await supabase.storage
         .from("reklamacje")
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false, // nie nadpisuje istniejących plików
+        });
 
       if (error) {
         console.error("Błąd przesyłania pliku:", error.message);
@@ -609,7 +685,12 @@ export default function Reklamacje() {
                       <span>{calculateRemainingTime(r.realizacja_do)} dni</span>
                     </div>
                   </td>
-                  <td className="p-2">
+                  <td
+                    className="p-2 cursor-pointer"
+                    onClick={() =>
+                      user?.role === "admin" && handleEditStatus(r)
+                    }
+                  >
                     <span
                       className={`px-3 py-1 rounded-full text-white text-sm font-semibold ${
                         r.status === "Zgłoszone"
@@ -623,7 +704,7 @@ export default function Reklamacje() {
                           : r.status === "Zaktualizowano"
                           ? "bg-orange-500"
                           : "bg-gray-500"
-                      }`}
+                      } hover:opacity-80 transition`}
                     >
                       {r.status}
                     </span>
@@ -874,6 +955,10 @@ export default function Reklamacje() {
                   fileType="application/pdf"
                   label="PDF"
                   filePreview={pdfPreview}
+                  onRemove={() => {
+                    setPdfFile(null);
+                    setPdfPreview(null);
+                  }}
                 />
                 {!pdfFile && (
                   <p className="text-red-500 text-sm">
@@ -902,6 +987,16 @@ export default function Reklamacje() {
                       fileType="image/*"
                       label={`Zdjęcie ${index + 1}`}
                       filePreview={imagePreviews[index]}
+                      onRemove={() => {
+                        const updatedFiles = [...imageFiles];
+                        const updatedPreviews = [...imagePreviews];
+
+                        updatedFiles[index] = null;
+                        updatedPreviews[index] = null;
+
+                        setImageFiles(updatedFiles);
+                        setImagePreviews(updatedPreviews);
+                      }}
                     />
                   ))}
                 </div>
@@ -1017,6 +1112,10 @@ export default function Reklamacje() {
                 <p>
                   <strong>Pozostały czas:</strong>{" "}
                   {selectedReklamacja.pozostaly_czas} dni
+                </p>
+                <p>
+                  <strong>Informacje od zgłaszającego:</strong>{" "}
+                  {selectedReklamacja.informacje_od_zglaszajacego}
                 </p>
               </div>
               <div>
@@ -1206,6 +1305,7 @@ export default function Reklamacje() {
                   }
                 />
 
+                {/* Załącznik PDF */}
                 <label className="font-semibold text-gray-700">
                   Załącznik PDF (wymagany)
                 </label>
@@ -1217,8 +1317,13 @@ export default function Reklamacje() {
                   fileType="application/pdf"
                   label="PDF"
                   filePreview={pdfPreview}
+                  onRemove={() => {
+                    setPdfFile(null);
+                    setPdfPreview(null);
+                  }}
                 />
 
+                {/* Załączniki zdjęciowe */}
                 <label className="font-semibold text-gray-700 mt-4">
                   Załączniki zdjęciowe (opcjonalne)
                 </label>
@@ -1239,6 +1344,16 @@ export default function Reklamacje() {
                       fileType="image/*"
                       label={`Zdjęcie ${index + 1}`}
                       filePreview={imagePreviews[index]}
+                      onRemove={() => {
+                        const updatedFiles = [...imageFiles];
+                        const updatedPreviews = [...imagePreviews];
+
+                        updatedFiles[index] = null;
+                        updatedPreviews[index] = null;
+
+                        setImageFiles(updatedFiles);
+                        setImagePreviews(updatedPreviews);
+                      }}
                     />
                   ))}
                 </div>
@@ -1342,6 +1457,16 @@ export default function Reklamacje() {
                   fileType="image/*"
                   label={`Zdjęcie ${index + 1}`}
                   filePreview={closeImagePreviews[index]}
+                  onRemove={() => {
+                    const updatedFiles = [...closeImageFiles];
+                    const updatedPreviews = [...closeImagePreviews];
+
+                    updatedFiles[index] = null;
+                    updatedPreviews[index] = null;
+
+                    setCloseImageFiles(updatedFiles);
+                    setCloseImagePreviews(updatedPreviews);
+                  }}
                 />
               ))}
             </div>
@@ -1355,6 +1480,47 @@ export default function Reklamacje() {
               <button
                 className="bg-red-500 text-white px-4 py-2 rounded"
                 onClick={() => setIsCloseOpen(false)}
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isStatusModalOpen && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-50"
+          style={{ background: "rgba(0, 0, 0, 0.4)" }}
+        >
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h3 className="text-xl font-semibold mb-4">
+              Zmień status reklamacji
+            </h3>
+            <select
+              className="border p-2 rounded w-full"
+              value={statusToUpdate?.status}
+              onChange={(e) =>
+                setStatusToUpdate({ ...statusToUpdate, status: e.target.value })
+              }
+            >
+              <option value="Zgłoszone">Zgłoszone</option>
+              <option value="W trakcie realizacji">W trakcie realizacji</option>
+              <option value="Oczekuje na informacje">
+                Oczekuje na informacje
+              </option>
+              <option value="Zakończone">Zakończone</option>
+              <option value="Zaktualizowano">Zaktualizowano</option>
+            </select>
+            <div className="flex justify-end mt-4">
+              <button
+                className="bg-green-500 text-white px-4 py-2 rounded mr-2"
+                onClick={() => updateStatus(statusToUpdate.status)}
+              >
+                Zapisz
+              </button>
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded"
+                onClick={() => setIsStatusModalOpen(false)}
               >
                 Anuluj
               </button>

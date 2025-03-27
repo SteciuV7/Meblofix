@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "next/router";
 import { FiLogOut } from "react-icons/fi"; // Zachowano działającą ikonę
-import { FaUser, FaArchive, FaWrench } from "react-icons/fa"; // Poprawione ikonki
+import { FaUser, FaArchive, FaWrench, FaCar, FaGlobe } from "react-icons/fa"; // Poprawione ikonki
 
 export default function Dashboard() {
   const [role, setRole] = useState(null);
@@ -17,7 +17,10 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) {
         console.error("Błąd pobierania użytkownika:", userError.message);
         setError("Nie udało się pobrać danych użytkownika.");
@@ -57,17 +60,49 @@ export default function Dashboard() {
   };
 
   const modules = [
-    { name: "Reklamacje", description: "Zarządzaj zgłoszeniami reklamacyjnymi.", link: "/reklamacje", icon: <FaWrench size={32} className="text-gray-700" /> },
-    { name: "Użytkownicy", description: "Zarządzaj kontami użytkowników systemu.", link: "/uzytkownicy", adminOnly: true, icon: <FaUser size={32} className="text-gray-700" /> },
-    { name: "Archiwum", description: "Przeglądaj zamknięte zgłoszenia reklamacyjne.", link: "/archiwum", icon: <FaArchive size={32} className="text-gray-700" /> },
+    {
+      name: "Reklamacje",
+      description: "Zarządzaj zgłoszeniami reklamacyjnymi.",
+      link: "/reklamacje",
+      icon: <FaWrench size={32} className="text-gray-700" />,
+    },
+    {
+      name: "Użytkownicy",
+      description: "Zarządzaj kontami użytkowników systemu.",
+      link: "/uzytkownicy",
+      adminOnly: true,
+      icon: <FaUser size={32} className="text-gray-700" />,
+    },
+    {
+      name: "Archiwum",
+      description: "Przeglądaj zamknięte zgłoszenia reklamacyjne.",
+      link: "/archiwum",
+      icon: <FaArchive size={32} className="text-gray-700" />,
+    },
+    /*{
+      name: "Trasy",
+      description: "Przeglądaj reklamacje dodane do wybranej trasy.",
+      link: "/trasy",
+      adminOnly: true,
+      icon: <FaCar size={32} className="text-gray-700" />,
+    },
+    {
+      name: "Mapa",
+      description:
+        "Przeglądaj reklamacje dodane do wybranej trasy na interaktywnej mapie.",
+      link: "/mapa",
+      icon: <FaGlobe size={32} className="text-gray-700" />,
+    },*/
   ];
-  
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-gray-100 to-gray-300">
       {/* Nagłówek */}
       <header className="bg-gray-900 text-white py-5 px-8 flex justify-between items-center shadow-lg">
-        <h1 className="text-2xl font-bold cursor-pointer hover:text-gray-300 transition" onClick={() => router.push("/dashboard")}>
+        <h1
+          className="text-2xl font-bold cursor-pointer hover:text-gray-300 transition"
+          onClick={() => router.push("/dashboard")}
+        >
           Meblofix Sp. z o.o.
         </h1>
 
@@ -100,7 +135,9 @@ export default function Dashboard() {
 
       {/* Kontener modułów */}
       <div className="max-w-5xl mx-auto py-12">
-        <h2 className="text-4xl font-extrabold text-gray-900 mb-10 text-center">Wybierz moduł</h2>
+        <h2 className="text-4xl font-extrabold text-gray-900 mb-10 text-center">
+          Wybierz moduł
+        </h2>
 
         {/* Obsługa ładowania i błędów */}
         {loading ? (
@@ -117,20 +154,25 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-6">
-            {modules.map((module, index) =>
-              (!module.adminOnly || role?.toLowerCase() === "admin") && (
-                <a
-                  key={index}
-                  href={module.link}
-                  className="bg-white shadow-md rounded-xl p-6 flex flex-col items-center space-y-4 hover:shadow-2xl transition transform hover:scale-105"
-                >
-                  <div className="bg-gray-200 p-4 rounded-full">
-                    {module.icon}
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900">{module.name}</h3>
-                  <p className="text-gray-600 text-center">{module.description}</p>
-                </a>
-              )
+            {modules.map(
+              (module, index) =>
+                (!module.adminOnly || role?.toLowerCase() === "admin") && (
+                  <a
+                    key={index}
+                    href={module.link}
+                    className="bg-white shadow-md rounded-xl p-6 flex flex-col items-center space-y-4 hover:shadow-2xl transition transform hover:scale-105"
+                  >
+                    <div className="bg-gray-200 p-4 rounded-full">
+                      {module.icon}
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      {module.name}
+                    </h3>
+                    <p className="text-gray-600 text-center">
+                      {module.description}
+                    </p>
+                  </a>
+                )
             )}
           </div>
         )}

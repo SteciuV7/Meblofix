@@ -8,6 +8,9 @@ import imageCompression from "browser-image-compression";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { AlertCircle, CheckCircle, Clock } from "lucide-react";
+import Tippy from "@tippyjs/react";
+import "tippy.js/dist/tippy.css";
+import { Truck } from "lucide-react";
 
 export default function Reklamacje() {
   const [selectedReklamacja, setSelectedReklamacja] = useState(null);
@@ -74,7 +77,51 @@ export default function Reklamacje() {
       alert(`Błąd: ${error.message}`);
     }
   };
+  const [selectedReklamacje, setSelectedReklamacje] = useState([]);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [routeDate, setRouteDate] = useState(new Date());
+  const handleSelectReklamacja = (id) => {
+    setSelectedReklamacje((prev) =>
+      prev.includes(id) ? prev.filter((rid) => rid !== id) : [...prev, id]
+    );
+  };
+  const assignToRoute = async () => {
+    try {
+      const { error } = await supabase
+        .from("reklamacje")
+        .update({ trasa: routeDate.toISOString() })
+        .in("id", selectedReklamacje);
 
+      if (error) throw error;
+
+      alert("✅ Reklamacje przypisane do trasy!");
+      setIsAssignModalOpen(false);
+      setSelectedReklamacje([]);
+      fetchReklamacje(); // Odśwież listę
+    } catch (error) {
+      alert(`Błąd: ${error.message}`);
+    }
+  };
+
+  function CarIcon({ trasa }) {
+    return (
+      <Tippy
+        content={
+          trasa
+            ? `Przypisano do trasy: ${new Date(trasa).toLocaleDateString()}`
+            : "Brak trasy"
+        }
+        placement="top"
+      >
+        <div className="flex items-center justify-center cursor-pointer">
+          <Truck
+            className={`w-6 h-6 ${trasa ? "text-green-500" : "text-gray-400"}`}
+          />
+        </div>
+      </Tippy>
+    );
+  }
   function calculateRemainingTime(targetDate) {
     const currentDate = new Date();
     const diffTime = new Date(targetDate) - currentDate;
@@ -96,6 +143,7 @@ export default function Reklamacje() {
     label,
     filePreview,
     onRemove,
+    fileTypeLabel,
   }) {
     const { getRootProps, getInputProps } = useDropzone({
       accept: fileType,
@@ -154,13 +202,28 @@ export default function Reklamacje() {
         ) : (
           <div>
             <p className="text-blue-500">Wgraj {label} lub przeciągnij tutaj</p>
-            <p className="text-gray-500 text-sm">
-              PNG, JPG, GIF, SVG, PDF do 2MB
-            </p>
+            <p className="text-gray-500 text-sm">{fileTypeLabel}</p>
           </div>
         )}
       </div>
     );
+  }
+  async function handleDeleteReklamacja(id) {
+    try {
+      const { error } = await supabase.from("reklamacje").delete().eq("id", id);
+
+      if (error) {
+        alert("Błąd usuwania reklamacji: " + error.message);
+        return;
+      }
+
+      alert("✅ Reklamacja została usunięta!");
+      setIsDeleteModalOpen(false);
+      setIsEditOpen(false);
+      location.reload();
+    } catch (error) {
+      alert("Błąd: " + error.message);
+    }
   }
   async function handleFinishReklamacja() {
     try {
@@ -466,6 +529,9 @@ export default function Reklamacje() {
           r.numer_faktury?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           r.miejscowosc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           r.kod_pocztowy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          new Date(r.data_zgloszenia)
+            .toLocaleDateString()
+            .includes(searchTerm.toLowerCase()) ||
           r.opis?.toLowerCase().includes(searchTerm.toLowerCase())) &&
         (filterStatus ? r.status === filterStatus : true)
     );
@@ -553,8 +619,18 @@ export default function Reklamacje() {
             <option value="Oczekuje na informacje">
               Oczekuje na informacje
             </option>
+            <option value="Oczekuje na dostawę">Oczekuje na dostawę</option>
             <option value="Zakończone">Zakończone</option>
           </select>
+          {/*user?.role === "admin" && (
+            <button
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+              disabled={selectedReklamacje.length === 0}
+              onClick={() => setIsAssignModalOpen(true)}
+            >
+              Przypisz do trasy
+            </button>
+          )*/}
           <button
             className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition"
             onClick={() => setShowAddModal(true)}
@@ -566,12 +642,18 @@ export default function Reklamacje() {
           <table className="table-auto w-full bg-white shadow-md rounded-lg p-5 table-responsive">
             <thead>
               <tr className="border-b">
-                <th className="p-2 text-left">Nr</th>
+                {/* {user?.role === "admin" && <th className="p-2 text-left"></th>} */}
+                {user?.role === "admin" && (
+                  <th className="p-2 text-left">Nr</th>
+                )}
                 <th className="p-2 text-left">Firma</th>
                 <th className="p-2 text-left">Nr reklamacji</th>
+                {/* <th className="p-2 text-left">Trasa</th> */}
                 <th className="p-2 text-left">Kod pocztowy</th>
+                <th className="p-2 text-left">Data dodania</th>
                 <th className="p-2 text-left">Miejscowość</th>
                 <th className="p-2 text-left">Opis</th>
+                <th className="p-2 text-left">Informacje</th>
                 <th className="p-2 text-left">Załączniki</th>
                 <th className="p-2 text-left">Termin realizacji</th>
                 <th className="p-2 text-left">Pozostały czas</th>
@@ -586,15 +668,34 @@ export default function Reklamacje() {
                   key={r.id}
                   className="border-b hover:bg-gray-200 transition"
                 >
-                  <td className="p-2 text-gray-900 text-xs">
-                    {r.nr_reklamacji}
-                  </td>
+                  {/*user?.role === "admin" && (
+                    <td className="p-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedReklamacje.includes(r.id)}
+                        onChange={() => handleSelectReklamacja(r.id)}
+                      />
+                    </td>
+                  )*/}
+                  {user?.role === "admin" && (
+                    <td className="p-2 text-gray-900 text-xs">
+                      {r.nr_reklamacji}
+                    </td>
+                  )}
                   <td className="p-2 text-gray-900 text-xs">{r.nazwa_firmy}</td>
                   <td className="p-2 text-gray-900 text-xs">
                     {r.numer_faktury}
                   </td>
+
+                  {/* <td className="p-2 text-gray-900 text-xs">
+                    <CarIcon trasa={r.trasa} />
+                  </td> */}
+
                   <td className="p-2 text-gray-900 text-xs">
                     {r.kod_pocztowy}
+                  </td>
+                  <td className="p-2 text-gray-900 text-xs">
+                    {new Date(r.data_zgloszenia).toLocaleDateString()}
                   </td>
                   <td className="p-2 text-gray-900 text-xs">{r.miejscowosc}</td>
                   <td className="p-2 text-gray-900 text-xs">
@@ -602,7 +703,13 @@ export default function Reklamacje() {
                       ? r.opis.substring(0, 25) + "..."
                       : r.opis}
                   </td>
-
+                  <td className="p-2 text-gray-900 text-xs">
+                    {r.informacje &&
+                    typeof r.informacje === "string" &&
+                    r.informacje.length > 25
+                      ? r.informacje.substring(0, 25) + "..."
+                      : r.informacje || "-"}
+                  </td>
                   <td className="p-2 text-gray-900 text-xs">
                     {r.zalacznik_pdf && (
                       <a
@@ -699,6 +806,8 @@ export default function Reklamacje() {
                           ? "bg-green-500"
                           : r.status === "W trakcie realizacji"
                           ? "bg-blue-500"
+                          : r.status === "Oczekuje na dostawę"
+                          ? "bg-purple-500"
                           : r.status === "Oczekuje na informacje"
                           ? "bg-red-500"
                           : r.status === "Zaktualizowano"
@@ -791,7 +900,8 @@ export default function Reklamacje() {
                   </td>
                   <td className="p-2">
                     {user?.role === "admin" &&
-                      r.status === "W trakcie realizacji" && (
+                      (r.status === "W trakcie realizacji" ||
+                        r.status === "Oczekuje na dostawę") && (
                         <button
                           className="bg-blue-600 text-white px-2 py-1 rounded text-xs mt-1"
                           onClick={() => {
@@ -917,6 +1027,7 @@ export default function Reklamacje() {
                   }
                 />
                 <label className="font-semibold">Termin realizacji</label>
+                <p></p>
                 <DatePicker
                   selected={realizacjaDate}
                   onChange={(date) => {
@@ -950,9 +1061,10 @@ export default function Reklamacje() {
                 <FileUploader
                   onFileSelect={(file) => {
                     setPdfFile(file);
-                    setPdfPreview(URL.createObjectURL(file)); // Tworzymy podgląd na podstawie nowego pliku
+                    setPdfPreview(URL.createObjectURL(file));
                   }}
                   fileType="application/pdf"
+                  fileTypeLabel="PDF do 2MB"
                   label="PDF"
                   filePreview={pdfPreview}
                   onRemove={() => {
@@ -985,6 +1097,7 @@ export default function Reklamacje() {
                         setImagePreviews(updatedPreviews);
                       }}
                       fileType="image/*"
+                      fileTypeLabel="PNG, JPG, GIF, SVG do 2MB"
                       label={`Zdjęcie ${index + 1}`}
                       filePreview={imagePreviews[index]}
                       onRemove={() => {
@@ -1116,6 +1229,10 @@ export default function Reklamacje() {
                 <p>
                   <strong>Informacje od zgłaszającego:</strong>{" "}
                   {selectedReklamacja.informacje_od_zglaszajacego}
+                </p>
+                <p className="break-words max-w-[90%] whitespace-pre-wrap">
+                  <strong>Informacje od Meblofix:</strong>{" "}
+                  {selectedReklamacja.informacje}
                 </p>
               </div>
               <div>
@@ -1278,6 +1395,7 @@ export default function Reklamacje() {
                   }
                 />
                 <label className="font-semibold">Termin realizacji</label>
+                <p></p>
                 <DatePicker
                   selected={realizacjaDate}
                   onChange={(date) => {
@@ -1290,6 +1408,25 @@ export default function Reklamacje() {
                   dateFormat="yyyy-MM-dd"
                   className="border p-2 w-full mb-2 rounded"
                 />
+                <p></p>
+                {user?.role === "admin" && (
+                  <label className="font-semibold">
+                    Informacje od Meblofix
+                    <p></p>
+                  </label>
+                )}
+                {user?.role === "admin" && (
+                  <textarea
+                    className="border p-2 w-full mb-2"
+                    value={selectedReklamacja.informacje}
+                    onChange={(e) =>
+                      setSelectedReklamacja({
+                        ...selectedReklamacja,
+                        informacje: e.target.value,
+                      })
+                    }
+                  />
+                )}
               </div>
 
               <div>
@@ -1310,11 +1447,12 @@ export default function Reklamacje() {
                   Załącznik PDF (wymagany)
                 </label>
                 <FileUploader
-                  onFileSelect={(file, previewUrl) => {
+                  onFileSelect={(file) => {
                     setPdfFile(file);
-                    setPdfPreview(previewUrl); // Zaktualizuj podgląd natychmiast
+                    setPdfPreview(previewUrl);
                   }}
                   fileType="application/pdf"
+                  fileTypeLabel="PDF do 2MB"
                   label="PDF"
                   filePreview={pdfPreview}
                   onRemove={() => {
@@ -1342,6 +1480,7 @@ export default function Reklamacje() {
                         setImagePreviews(updatedPreviews);
                       }}
                       fileType="image/*"
+                      fileTypeLabel="PNG, JPG, GIF, SVG do 2MB"
                       label={`Zdjęcie ${index + 1}`}
                       filePreview={imagePreviews[index]}
                       onRemove={() => {
@@ -1361,6 +1500,14 @@ export default function Reklamacje() {
             </div>
 
             <div className="flex justify-end mt-4">
+              {user?.role === "admin" && (
+                <button
+                  className="bg-red-600 text-white px-4 py-2 rounded mr-2"
+                  onClick={() => setIsDeleteModalOpen(true)}
+                >
+                  Usuń reklamację
+                </button>
+              )}
               <button
                 className="bg-green-500 text-white px-4 py-2 rounded mr-2"
                 onClick={async () => {
@@ -1455,6 +1602,7 @@ export default function Reklamacje() {
                     setCloseImagePreviews(updatedPreviews);
                   }}
                   fileType="image/*"
+                  fileTypeLabel="PNG, JPG, GIF, SVG do 2MB"
                   label={`Zdjęcie ${index + 1}`}
                   filePreview={closeImagePreviews[index]}
                   onRemove={() => {
@@ -1508,6 +1656,7 @@ export default function Reklamacje() {
               <option value="Oczekuje na informacje">
                 Oczekuje na informacje
               </option>
+              <option value="Oczekuje na dostawę">Oczekuje na dostawę</option>
               <option value="Zakończone">Zakończone</option>
               <option value="Zaktualizowano">Zaktualizowano</option>
             </select>
@@ -1521,6 +1670,67 @@ export default function Reklamacje() {
               <button
                 className="bg-red-500 text-white px-4 py-2 rounded"
                 onClick={() => setIsStatusModalOpen(false)}
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isAssignModalOpen && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-50"
+          style={{ background: "rgba(0, 0, 0, 0.4)" }}
+        >
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h3 className="text-xl font-semibold mb-4">Przypisz do trasy</h3>
+            <label className="font-semibold">Wybierz datę trasy:</label>
+            <DatePicker
+              selected={routeDate}
+              onChange={(date) => setRouteDate(date)}
+              dateFormat="yyyy-MM-dd"
+              className="border p-2 w-full mb-4 rounded"
+            />
+            <div className="flex justify-end">
+              <button
+                className="bg-green-500 text-white px-4 py-2 rounded mr-2"
+                onClick={assignToRoute}
+              >
+                Zapisz
+              </button>
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded"
+                onClick={() => setIsAssignModalOpen(false)}
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isDeleteModalOpen && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-50"
+          style={{ background: "rgba(0, 0, 0, 0.4)" }}
+        >
+          <div className="bg-white rounded-lg shadow-lg p-6 w-1/3">
+            <h3 className="text-xl font-semibold mb-4">
+              Potwierdzenie usunięcia
+            </h3>
+            <p>
+              Czy na pewno chcesz usunąć tę reklamację? Tej operacji nie można
+              cofnąć.
+            </p>
+            <div className="flex justify-end mt-4">
+              <button
+                className="bg-red-600 text-white px-4 py-2 rounded mr-2"
+                onClick={() => handleDeleteReklamacja(selectedReklamacja.id)}
+              >
+                Usuń
+              </button>
+              <button
+                className="bg-gray-500 text-white px-4 py-2 rounded"
+                onClick={() => setIsDeleteModalOpen(false)}
               >
                 Anuluj
               </button>

@@ -8,6 +8,9 @@ import imageCompression from "browser-image-compression";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { AlertCircle, CheckCircle, Clock } from "lucide-react";
+import Tippy from "@tippyjs/react";
+import "tippy.js/dist/tippy.css";
+import { Truck } from "lucide-react";
 
 export default function Reklamacje() {
   const [selectedReklamacja, setSelectedReklamacja] = useState(null);
@@ -64,7 +67,24 @@ export default function Reklamacje() {
   function handleClosePopup() {
     setZoomedImage(null);
   }
-
+  function CarIcon({ trasa }) {
+    return (
+      <Tippy
+        content={
+          trasa
+            ? `Przypisano do trasy: ${new Date(trasa).toLocaleDateString()}`
+            : "Brak trasy"
+        }
+        placement="top"
+      >
+        <div className="flex items-center justify-center cursor-pointer">
+          <Truck
+            className={`w-6 h-6 ${trasa ? "text-green-500" : "text-gray-400"}`}
+          />
+        </div>
+      </Tippy>
+    );
+  }
   function FileUploader({ onFileSelect, fileType, label, filePreview }) {
     const { getRootProps, getInputProps } = useDropzone({
       accept: fileType,
@@ -111,9 +131,7 @@ export default function Reklamacje() {
         ) : (
           <div>
             <p className="text-blue-500">Wgraj {label} lub przeciągnij tutaj</p>
-            <p className="text-gray-500 text-sm">
-              PNG, JPG, GIF, SVG, PDF do 2MB
-            </p>
+            <p className="text-gray-500 text-sm">PNG, JPG, GIF, SVG do 2MB</p>
           </div>
         )}
       </div>
@@ -449,14 +467,21 @@ export default function Reklamacje() {
           <table className="table-auto w-full bg-white shadow-md rounded-lg p-5 table-responsive">
             <thead>
               <tr className="border-b">
-                <th className="p-2 text-left">Nr</th>
+                {/* {user?.role === "admin" && <th className="p-2 text-left"></th>} */}
+                {user?.role === "admin" && (
+                  <th className="p-2 text-left">Nr</th>
+                )}
                 <th className="p-2 text-left">Firma</th>
                 <th className="p-2 text-left">Nr reklamacji</th>
+                {/* <th className="p-2 text-left">Trasa</th> */}
                 <th className="p-2 text-left">Kod pocztowy</th>
+                <th className="p-2 text-left">Data dodania</th>
                 <th className="p-2 text-left">Miejscowość</th>
                 <th className="p-2 text-left">Opis</th>
+                <th className="p-2 text-left">Informacje</th>
                 <th className="p-2 text-left">Załączniki</th>
                 <th className="p-2 text-left">Termin realizacji</th>
+                <th className="p-2 text-left">Pozostały czas</th>
                 <th className="p-2 text-left">Status</th>
                 <th className="p-2 text-left">Podgląd</th>
               </tr>
@@ -467,12 +492,31 @@ export default function Reklamacje() {
                   key={r.id}
                   className="border-b hover:bg-gray-200 transition"
                 >
-                  <td className="p-2 text-gray-900 text-xs">
-                    {r.nr_reklamacji}
-                  </td>
+                  {/* {user?.role === "admin" && (
+                    <td className="p-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedReklamacje.includes(r.id)}
+                        onChange={() => handleSelectReklamacja(r.id)}
+                      />
+                    </td>
+                  )} */}
+                  {user?.role === "admin" && (
+                    <td className="p-2 text-gray-900 text-xs">
+                      {r.nr_reklamacji}
+                    </td>
+                  )}
                   <td className="p-2 text-gray-900 text-xs">{r.nazwa_firmy}</td>
                   <td className="p-2 text-gray-900 text-xs">
                     {r.numer_faktury}
+                  </td>
+
+                  {/* <td className="p-2 text-gray-900 text-xs">
+                    <CarIcon trasa={r.trasa} />
+                  </td> */}
+
+                  <td className="p-2 text-gray-900 text-xs">
+                    {new Date(r.data_zgloszenia).toLocaleDateString()}
                   </td>
                   <td className="p-2 text-gray-900 text-xs">
                     {r.kod_pocztowy}
@@ -482,6 +526,13 @@ export default function Reklamacje() {
                     {r.opis.length > 25
                       ? r.opis.substring(0, 25) + "..."
                       : r.opis}
+                  </td>
+                  <td className="p-2 text-gray-900 text-xs">
+                    {r.informacje &&
+                    typeof r.informacje === "string" &&
+                    r.informacje.length > 25
+                      ? r.informacje.substring(0, 25) + "..."
+                      : r.informacje || "-"}
                   </td>
                   <td className="p-2 text-gray-900 text-xs">
                     {r.zalacznik_pdf && (
@@ -514,11 +565,12 @@ export default function Reklamacje() {
                     </div>
 
                     {/* Popup powiększonego zdjęcia */}
-                    {/* Popup powiększonego zdjęcia */}
                     {zoomedImage && (
                       <div
                         className="fixed inset-0 flex justify-center items-center z-60 popup-image"
-                        style={{ background: "rgba(0, 0, 0, 0.4)" }}
+                        style={{
+                          background: "rgba(0, 0, 0, 0.4) !important",
+                        }}
                         onClick={handleClosePopup}
                       >
                         <div className="relative">
@@ -545,6 +597,31 @@ export default function Reklamacje() {
                     {new Date(r.realizacja_do).toLocaleDateString()}
                   </td>
                   <td className="p-2">
+                    <div
+                      className={`flex items-center justify-center space-x-1 px-2 py-1 rounded text-white font-bold ${
+                        calculateRemainingTime(r.realizacja_do) <= 5
+                          ? "bg-red-500"
+                          : calculateRemainingTime(r.realizacja_do) <= 10
+                          ? "bg-yellow-500"
+                          : "bg-green-500"
+                      }`}
+                    >
+                      {calculateRemainingTime(r.realizacja_do) <= 5 ? (
+                        <AlertCircle className="w-4 h-4" />
+                      ) : calculateRemainingTime(r.realizacja_do) <= 10 ? (
+                        <Clock className="w-4 h-4" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      <span>{calculateRemainingTime(r.realizacja_do)} dni</span>
+                    </div>
+                  </td>
+                  <td
+                    className="p-2 cursor-pointer"
+                    onClick={() =>
+                      user?.role === "admin" && handleEditStatus(r)
+                    }
+                  >
                     <span
                       className={`px-3 py-1 rounded-full text-white text-sm font-semibold ${
                         r.status === "Zgłoszone"
@@ -558,7 +635,7 @@ export default function Reklamacje() {
                           : r.status === "Zaktualizowano"
                           ? "bg-orange-500"
                           : "bg-gray-500"
-                      }`}
+                      } hover:opacity-80 transition`}
                     >
                       {r.status}
                     </span>
@@ -618,6 +695,14 @@ export default function Reklamacje() {
                 <p>
                   <strong>Pozostały czas:</strong>{" "}
                   {selectedReklamacja.pozostaly_czas} dni
+                </p>
+                <p>
+                  <strong>Informacje od zgłaszającego:</strong>{" "}
+                  {selectedReklamacja.informacje_od_zglaszajacego}
+                </p>
+                <p className="break-words max-w-[90%] whitespace-pre-wrap">
+                  <strong>Informacje od Meblofix:</strong>{" "}
+                  {selectedReklamacja.informacje}
                 </p>
               </div>
               <div>

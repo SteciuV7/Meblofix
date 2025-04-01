@@ -34,6 +34,8 @@ export default function Reklamacje() {
     const { nr_reklamacji, ...restData } = selectedReklamacja;
     reklamacjaData = restData;
   }
+  const [closePdfFile, setClosePdfFile] = useState(null);
+  const [closePdfPreview, setClosePdfPreview] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [realizacjaDate, setRealizacjaDate] = useState(new Date());
@@ -147,13 +149,13 @@ export default function Reklamacje() {
   }) {
     const { getRootProps, getInputProps } = useDropzone({
       accept: fileType,
-      maxSize: 2 * 1024 * 1024, // Maks. 2MB
-      onDrop: (acceptedFiles) => {
-        const file = acceptedFiles[0];
-        if (file) {
-          const previewUrl = URL.createObjectURL(file); // Utwórz podgląd natychmiast
-          onFileSelect(file, previewUrl); // Przekaż zarówno plik, jak i podgląd
+      onDrop: async (acceptedFiles) => {
+        let file = acceptedFiles[0];
+        if (file && fileType.includes("image")) {
+          file = await compressImage(file); // Kompresja tuż po wczytaniu
         }
+        const previewUrl = URL.createObjectURL(file);
+        onFileSelect(file, previewUrl);
       },
     });
 
@@ -235,12 +237,18 @@ export default function Reklamacje() {
         }
       }
 
+      let pdfEndPath = null;
+      if (closePdfFile) {
+        pdfEndPath = await uploadFile(closePdfFile, "pdfs");
+      }
+
       const { error } = await supabase
         .from("reklamacje")
         .update({
           status: "Zakończone",
           opis_przebiegu: opisPrzebiegu,
           zalacznik_zakonczenie: imagePaths,
+          zalacznik_pdf_zakonczenie: pdfEndPath, // ✅ zapisz PDF
         })
         .eq("id", selectedReklamacja.id);
 
@@ -259,17 +267,17 @@ export default function Reklamacje() {
   async function compressImage(file) {
     try {
       const options = {
-        maxSizeMB: 0.5, // Maksymalny rozmiar pliku w MB (0.5 MB = 500 KB)
-        maxWidthOrHeight: 1024, // Maksymalna szerokość/wysokość w px
-        useWebWorker: true, // Użyj Web Workerów
+        maxSizeMB: 0.5, // Do 500 KB
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
       };
       const compressedFile = await imageCompression(file, options);
-      console.log("Rozmiar przed kompresją:", file.size / 1024, "KB");
-      console.log("Rozmiar po kompresji:", compressedFile.size / 1024, "KB");
+      console.log("Rozmiar przed:", file.size / 1024, "KB");
+      console.log("Rozmiar po:", compressedFile.size / 1024, "KB");
       return compressedFile;
     } catch (error) {
-      console.error("Błąd kompresji obrazu:", error);
-      return file; // Jeśli kompresja się nie powiedzie, zwróć oryginał
+      console.error("Błąd kompresji:", error);
+      return file; // Jak nie wyjdzie, to przekaż oryginał
     }
   }
 
@@ -835,6 +843,7 @@ export default function Reklamacje() {
                         className="bg-blue-500 text-white px-2 py-1 rounded text-xs"
                         onClick={() => {
                           setSelectedReklamacja(r);
+                          setRealizacjaDate(new Date(r.realizacja_do)); // ⬅️ ustawia datę do DatePicker
                           setIsEditOpen(true);
                         }}
                       >
@@ -1064,7 +1073,7 @@ export default function Reklamacje() {
                     setPdfPreview(URL.createObjectURL(file));
                   }}
                   fileType="application/pdf"
-                  fileTypeLabel="PDF do 2MB"
+                  fileTypeLabel="PDF"
                   label="PDF"
                   filePreview={pdfPreview}
                   onRemove={() => {
@@ -1097,7 +1106,7 @@ export default function Reklamacje() {
                         setImagePreviews(updatedPreviews);
                       }}
                       fileType="image/*"
-                      fileTypeLabel="PNG, JPG, GIF, SVG do 2MB"
+                      fileTypeLabel="PNG, JPG, GIF, SVG"
                       label={`Zdjęcie ${index + 1}`}
                       filePreview={imagePreviews[index]}
                       onRemove={() => {
@@ -1246,7 +1255,6 @@ export default function Reklamacje() {
                 >
                   Otwórz PDF
                 </a>
-
                 <p>
                   <strong>Załączniki zdjęciowe:</strong>
                 </p>
@@ -1269,7 +1277,6 @@ export default function Reklamacje() {
                     />
                   ))}
                 </div>
-
                 {/* Opis przebiegu reklamacji */}
                 {selectedReklamacja.opis_przebiegu && (
                   <>
@@ -1282,30 +1289,51 @@ export default function Reklamacje() {
                   </>
                 )}
 
-                <p className="mt-4">
-                  <strong>Zdjęcia zwrotne:</strong>
-                </p>
-                <div className="flex overflow-x-auto space-x-2 mt-1 max-w-full">
-                  {selectedReklamacja.zalacznik_zakonczenie?.map(
-                    (img, index) => (
-                      <Image
-                        key={index}
-                        src={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`}
-                        alt="Załącznik zakończenia"
-                        width={80}
-                        height={80}
-                        className="h-20 w-20 object-cover rounded cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleImageClick(
-                            `https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`
-                          );
-                        }}
-                        unoptimized
-                      />
-                    )
-                  )}
-                </div>
+                {/* PDF po zakończeniu */}
+                {selectedReklamacja.zalacznik_pdf_zakonczenie && (
+                  <>
+                    <p className="mt-4">
+                      <strong>PDF po zakończeniu:</strong>
+                    </p>
+                    <a
+                      href={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${selectedReklamacja.zalacznik_pdf_zakonczenie}`}
+                      target="_blank"
+                      className="text-blue-500 underline"
+                    >
+                      Otwórz PDF
+                    </a>
+                  </>
+                )}
+
+                {/* Zdjęcia zwrotne */}
+                {selectedReklamacja.zalacznik_zakonczenie?.length > 0 && (
+                  <>
+                    <p className="mt-4">
+                      <strong>Zdjęcia zwrotne:</strong>
+                    </p>
+                    <div className="flex overflow-x-auto space-x-2 mt-1 max-w-full">
+                      {selectedReklamacja.zalacznik_zakonczenie.map(
+                        (img, index) => (
+                          <Image
+                            key={index}
+                            src={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`}
+                            alt="Załącznik zakończenia"
+                            width={80}
+                            height={80}
+                            className="h-20 w-20 object-cover rounded cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleImageClick(
+                                `https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`
+                              );
+                            }}
+                            unoptimized
+                          />
+                        )
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex justify-end mt-4">
@@ -1452,7 +1480,7 @@ export default function Reklamacje() {
                     setPdfPreview(previewUrl);
                   }}
                   fileType="application/pdf"
-                  fileTypeLabel="PDF do 2MB"
+                  fileTypeLabel="PDF"
                   label="PDF"
                   filePreview={pdfPreview}
                   onRemove={() => {
@@ -1480,7 +1508,7 @@ export default function Reklamacje() {
                         setImagePreviews(updatedPreviews);
                       }}
                       fileType="image/*"
-                      fileTypeLabel="PNG, JPG, GIF, SVG do 2MB"
+                      fileTypeLabel="PNG, JPG, GIF, SVG"
                       label={`Zdjęcie ${index + 1}`}
                       filePreview={imagePreviews[index]}
                       onRemove={() => {
@@ -1588,6 +1616,23 @@ export default function Reklamacje() {
               value={opisPrzebiegu}
               onChange={(e) => setOpisPrzebiegu(e.target.value)}
             />
+            <label className="font-semibold mt-4">
+              Załącznik PDF (opcjonalny)
+            </label>
+            <FileUploader
+              onFileSelect={(file) => {
+                setClosePdfFile(file);
+                setClosePdfPreview(URL.createObjectURL(file));
+              }}
+              fileType="application/pdf"
+              fileTypeLabel="PDF do 2MB"
+              label="PDF zakończenia"
+              filePreview={closePdfPreview}
+              onRemove={() => {
+                setClosePdfFile(null);
+                setClosePdfPreview(null);
+              }}
+            />
             <label className="font-semibold">Zdjęcia (maks. 4)</label>
             <div className="grid grid-cols-2 gap-2">
               {[...Array(4)].map((_, index) => (
@@ -1602,7 +1647,7 @@ export default function Reklamacje() {
                     setCloseImagePreviews(updatedPreviews);
                   }}
                   fileType="image/*"
-                  fileTypeLabel="PNG, JPG, GIF, SVG do 2MB"
+                  fileTypeLabel="PNG, JPG, GIF, SVG"
                   label={`Zdjęcie ${index + 1}`}
                   filePreview={closeImagePreviews[index]}
                   onRemove={() => {

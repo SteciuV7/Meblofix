@@ -1353,7 +1353,7 @@ export default function Reklamacje() {
           className="fixed inset-0 flex justify-center items-center z-50"
           style={{ background: "rgba(0, 0, 0, 0.4)" }}
         >
-          <div className="bg-white rounded-lg shadow-lg p-6 w-2/3">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-2/3 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">Edytuj reklamację</h3>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1527,6 +1527,115 @@ export default function Reklamacje() {
               </div>
             </div>
 
+            {user?.role === "admin" && (
+              <div className="mt-6 border-t pt-4">
+                <h4 className="text-lg font-semibold mb-2">
+                  Dane zakończenia reklamacji (admin)
+                </h4>
+
+                <label className="font-semibold">
+                  Opis przebiegu reklamacji
+                </label>
+                <textarea
+                  className="border p-2 w-full mb-4"
+                  value={selectedReklamacja.opis_przebiegu || ""}
+                  onChange={(e) =>
+                    setSelectedReklamacja({
+                      ...selectedReklamacja,
+                      opis_przebiegu: e.target.value,
+                    })
+                  }
+                />
+
+                <label className="font-semibold">
+                  PDF zakończenia (opcjonalny)
+                </label>
+                <FileUploader
+                  onFileSelect={(file) => {
+                    setClosePdfFile(file);
+                    setClosePdfPreview(URL.createObjectURL(file));
+                  }}
+                  fileType="application/pdf"
+                  fileTypeLabel="PDF"
+                  label="PDF zakończenia"
+                  filePreview={closePdfPreview}
+                  onRemove={() => {
+                    setClosePdfFile(null);
+                    setClosePdfPreview(null);
+                  }}
+                />
+                {selectedReklamacja.zalacznik_pdf_zakonczenie && (
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-700">Aktualny PDF:</p>
+                    <a
+                      href={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${selectedReklamacja.zalacznik_pdf_zakonczenie}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      Zobacz aktualny PDF
+                    </a>
+                  </div>
+                )}
+                <label className="font-semibold mt-4 block">
+                  Zdjęcia zakończeniowe (maks. 4)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[...Array(4)].map((_, index) => (
+                    <FileUploader
+                      key={index}
+                      onFileSelect={(file, previewUrl) => {
+                        const updatedFiles = [...closeImageFiles];
+                        const updatedPreviews = [...closeImagePreviews];
+
+                        updatedFiles[index] = file;
+                        updatedPreviews[index] = previewUrl;
+
+                        setCloseImageFiles(updatedFiles);
+                        setCloseImagePreviews(updatedPreviews);
+                      }}
+                      fileType="image/*"
+                      fileTypeLabel="PNG, JPG, GIF"
+                      label={`Zdjęcie ${index + 1}`}
+                      filePreview={closeImagePreviews[index]}
+                      onRemove={() => {
+                        const updatedFiles = [...closeImageFiles];
+                        const updatedPreviews = [...closeImagePreviews];
+
+                        updatedFiles[index] = null;
+                        updatedPreviews[index] = null;
+
+                        setCloseImageFiles(updatedFiles);
+                        setCloseImagePreviews(updatedPreviews);
+                      }}
+                    />
+                  ))}
+                  {selectedReklamacja.zalacznik_zakonczenie?.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm text-gray-700 mb-1">
+                        Aktualne zdjęcia:
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {selectedReklamacja.zalacznik_zakonczenie.map(
+                          (img, index) => (
+                            <Image
+                              key={index}
+                              src={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`}
+                              alt={`Zakończenie ${index + 1}`}
+                              width={80}
+                              height={80}
+                              className="rounded object-cover h-20 w-20"
+                              unoptimized
+                            />
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end mt-4">
               {user?.role === "admin" && (
                 <button
@@ -1554,27 +1663,65 @@ export default function Reklamacje() {
                           imageFiles[i],
                           "images"
                         );
-                        imagePaths[i] = imagePath; // Aktualizujemy tylko zmieniony obraz
+                        imagePaths[i] = imagePath;
                       }
                     }
 
-                    let reklamacjaData = {};
-                    if (selectedReklamacja) {
-                      const { nr_reklamacji, ...restData } = selectedReklamacja;
-                      reklamacjaData = restData;
+                    // ➕ Nowość: upload danych zakończeniowych (dla admina)
+                    let pdfZakonczeniePath =
+                      selectedReklamacja?.zalacznik_pdf_zakonczenie || null;
+                    if (user?.role === "admin" && closePdfFile) {
+                      pdfZakonczeniePath = await uploadFile(
+                        closePdfFile,
+                        "pdfs"
+                      );
+                    }
+
+                    let zalacznikZakonczenie =
+                      selectedReklamacja.zalacznik_zakonczenie
+                        ? [...selectedReklamacja.zalacznik_zakonczenie]
+                        : [];
+
+                    if (user?.role === "admin") {
+                      for (let i = 0; i < closeImageFiles.length; i++) {
+                        if (closeImageFiles[i]) {
+                          const imagePath = await uploadFile(
+                            closeImageFiles[i],
+                            "images"
+                          );
+                          zalacznikZakonczenie[i] = imagePath;
+                        }
+                      }
                     }
 
                     const remainingTime =
                       calculateRemainingTime(realizacjaDate);
 
+                    const { nr_reklamacji, ...reklamacjaData } =
+                      selectedReklamacja;
+
+                    const aktualizowaneDane = {
+                      ...reklamacjaData,
+                      zalacznik_pdf: pdfPath,
+                      zalacznik_zdjecia: imagePaths,
+                      realizacja_do: realizacjaDate.toISOString(),
+                      pozostaly_czas: remainingTime,
+                      status: "Zaktualizowano",
+                    };
+
+                    // ➕ tylko jeśli admin, dodaj dane z zakończenia
+                    if (user?.role === "admin") {
+                      aktualizowaneDane.opis_przebiegu =
+                        selectedReklamacja.opis_przebiegu || "";
+                      aktualizowaneDane.zalacznik_pdf_zakonczenie =
+                        pdfZakonczeniePath;
+                      aktualizowaneDane.zalacznik_zakonczenie =
+                        zalacznikZakonczenie;
+                    }
+
                     const { error } = await supabase
                       .from("reklamacje")
-                      .update({
-                        ...reklamacjaData,
-                        status: "Zaktualizowano", // Zmiana statusu na "Zaktualizowano"
-                        realizacja_do: realizacjaDate.toISOString(),
-                        pozostaly_czas: remainingTime,
-                      })
+                      .update(aktualizowaneDane)
                       .eq("id", selectedReklamacja.id);
 
                     if (error) {

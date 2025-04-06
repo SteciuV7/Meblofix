@@ -28,6 +28,7 @@ export default function Reklamacje() {
   const [pdfPreview, setPdfPreview] = useState(null); // Podgląd PDF
   const [imagePreviews, setImagePreviews] = useState(Array(4).fill(null)); // Podgląd zdjęć
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [potwierdzonoZapoznanie, setPotwierdzonoZapoznanie] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
   let reklamacjaData = {};
   if (selectedReklamacja) {
@@ -60,12 +61,15 @@ export default function Reklamacje() {
     setStatusToUpdate(reklamacja);
     setIsStatusModalOpen(true);
   };
-  const updateStatus = async (newStatus) => {
+  const updateStatus = async (reklamacja) => {
     try {
       const { error } = await supabase
         .from("reklamacje")
-        .update({ status: newStatus })
-        .eq("id", statusToUpdate.id);
+        .update({
+          status: reklamacja.status,
+          nieprzeczytane_dla_uzytkownika: true,
+        })
+        .eq("id", reklamacja.id);
 
       if (error) {
         alert(`Błąd aktualizacji statusu: ${error.message}`);
@@ -249,6 +253,7 @@ export default function Reklamacje() {
           opis_przebiegu: opisPrzebiegu,
           zalacznik_zakonczenie: imagePaths,
           zalacznik_pdf_zakonczenie: pdfEndPath, // ✅ zapisz PDF
+          nieprzeczytane_dla_uzytkownika: true,
         })
         .eq("id", selectedReklamacja.id);
 
@@ -531,20 +536,40 @@ export default function Reklamacje() {
   // 🔍 Wyszukiwanie i filtrowanie
   useEffect(() => {
     if (!reklamacje || reklamacje.length === 0) return;
-    const filtered = reklamacje.filter(
-      (r) =>
-        (r.nazwa_firmy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.numer_faktury?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.miejscowosc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.kod_pocztowy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          new Date(r.data_zgloszenia)
-            .toLocaleDateString()
-            .includes(searchTerm.toLowerCase()) ||
-          r.opis?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        (filterStatus ? r.status === filterStatus : true)
-    );
+
+    const filtered = reklamacje
+      .filter(
+        (r) =>
+          (r.nazwa_firmy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            r.numer_faktury?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            r.miejscowosc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            r.kod_pocztowy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            new Date(r.data_zgloszenia)
+              .toLocaleDateString()
+              .includes(searchTerm.toLowerCase()) ||
+            r.opis?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+          (filterStatus ? r.status === filterStatus : true)
+      )
+      .sort((a, b) => {
+        if (user?.role !== "admin") {
+          // Najpierw nieprzeczytane
+          if (
+            a.nieprzeczytane_dla_uzytkownika &&
+            !b.nieprzeczytane_dla_uzytkownika
+          )
+            return -1;
+          if (
+            !a.nieprzeczytane_dla_uzytkownika &&
+            b.nieprzeczytane_dla_uzytkownika
+          )
+            return 1;
+        }
+        // W innym wypadku sortuj po dacie zgłoszenia malejąco
+        return new Date(b.data_zgloszenia) - new Date(a.data_zgloszenia);
+      });
+
     setFilteredReklamacje(filtered);
-  }, [searchTerm, filterStatus, reklamacje]);
+  }, [searchTerm, filterStatus, reklamacje, user]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -622,7 +647,7 @@ export default function Reklamacje() {
           >
             <option value="">Wszystkie statusy</option>
             <option value="Zgłoszone">Zgłoszone</option>
-            <option value="Zakończone">Zaktualizowano</option>
+            <option value="Zaktualizowano">Zaktualizowano</option>
             <option value="W trakcie realizacji">W trakcie realizacji</option>
             <option value="Oczekuje na informacje">
               Oczekuje na informacje
@@ -647,7 +672,7 @@ export default function Reklamacje() {
           </button>
         </div>
         <div className="overflow-x-auto w-full table-container">
-          <table className="table-auto w-full bg-white shadow-md rounded-lg p-5 table-responsive">
+          <table className="table-auto w-full border-separate border-spacing-y-3 table-responsive">
             <thead>
               <tr className="border-b">
                 {/* {user?.role === "admin" && <th className="p-2 text-left"></th>} */}
@@ -674,7 +699,25 @@ export default function Reklamacje() {
               {(filteredReklamacje || []).map((r) => (
                 <tr
                   key={r.id}
-                  className="border-b hover:bg-gray-200 transition"
+                  className={`transition ${
+                    user?.role !== "admin" && r.nieprzeczytane_dla_uzytkownika
+                      ? `${
+                          r.status === "Zgłoszone"
+                            ? "bg-yellow-200/80"
+                            : r.status === "Zakończone"
+                            ? "bg-green-200/80"
+                            : r.status === "W trakcie realizacji"
+                            ? "bg-blue-200/80"
+                            : r.status === "Oczekuje na informacje"
+                            ? "bg-red-200/80"
+                            : r.status === "Oczekuje na dostawę"
+                            ? "bg-purple-200/80"
+                            : r.status === "Zaktualizowano"
+                            ? "bg-orange-200/80"
+                            : "bg-gray-200/80"
+                        }`
+                      : ""
+                  }`}
                 >
                   {/*user?.role === "admin" && (
                     <td className="p-2 text-center">
@@ -863,7 +906,10 @@ export default function Reklamacje() {
                               try {
                                 const { error } = await supabase
                                   .from("reklamacje")
-                                  .update({ status: "W trakcie realizacji" })
+                                  .update({
+                                    status: "W trakcie realizacji",
+                                    nieprzeczytane_dla_uzytkownika: true,
+                                  })
                                   .eq("id", r.id);
 
                                 if (error) {
@@ -886,7 +932,10 @@ export default function Reklamacje() {
                               try {
                                 const { error } = await supabase
                                   .from("reklamacje")
-                                  .update({ status: "Oczekuje na informacje" })
+                                  .update({
+                                    status: "Oczekuje na informacje",
+                                    nieprzeczytane_dla_uzytkownika: true,
+                                  })
                                   .eq("id", r.id);
 
                                 if (error) {
@@ -1169,6 +1218,7 @@ export default function Reklamacje() {
                         data_zakonczenia: realizacjaDate.toISOString(),
                         realizacja_do: realizacjaDate.toISOString(),
                         pozostaly_czas: remainingTime,
+                        nieprzeczytane_dla_uzytkownika: true,
                       },
                     ]);
 
@@ -1336,10 +1386,61 @@ export default function Reklamacje() {
                 )}
               </div>
             </div>
+            {user?.role !== "admin" &&
+              selectedReklamacja.nieprzeczytane_dla_uzytkownika && (
+                <div className="mt-6 p-4 border border-yellow-400 rounded bg-yellow-100 text-gray-900">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-5 w-5 text-yellow-600"
+                      checked={potwierdzonoZapoznanie}
+                      onChange={(e) =>
+                        setPotwierdzonoZapoznanie(e.target.checked)
+                      }
+                    />
+                    <span className="font-medium">
+                      Potwierdzam zapoznanie się z reklamacją
+                    </span>
+                  </label>
+                </div>
+              )}
+
             <div className="flex justify-end mt-4">
               <button
                 className="bg-red-500 text-white px-4 py-2 rounded"
-                onClick={() => setIsPreviewOpen(false)}
+                onClick={async () => {
+                  // Jeśli użytkownik i reklamacja nieprzeczytana — musi zaznaczyć checkbox
+                  if (
+                    user?.role !== "admin" &&
+                    selectedReklamacja.nieprzeczytane_dla_uzytkownika &&
+                    !potwierdzonoZapoznanie
+                  ) {
+                    alert("Aby zamknąć, musisz zaznaczyć potwierdzenie.");
+                    return;
+                  }
+
+                  try {
+                    // Jeśli checkbox zaznaczony i reklamacja nieprzeczytana — aktualizuj
+                    if (
+                      user?.role !== "admin" &&
+                      selectedReklamacja.nieprzeczytane_dla_uzytkownika &&
+                      potwierdzonoZapoznanie
+                    ) {
+                      const { error } = await supabase
+                        .from("reklamacje")
+                        .update({ nieprzeczytane_dla_uzytkownika: false })
+                        .eq("id", selectedReklamacja.id);
+
+                      if (error) throw error;
+                    }
+
+                    setIsPreviewOpen(false); // Zamknij modal
+                    setSelectedReklamacja(null); // Wyczyść zaznaczenie
+                    fetchReklamacje(); // Odśwież dane
+                  } catch (error) {
+                    alert("Błąd podczas zamykania: " + error.message);
+                  }
+                }}
               >
                 Zamknij
               </button>
@@ -1707,6 +1808,9 @@ export default function Reklamacje() {
                       realizacja_do: realizacjaDate.toISOString(),
                       pozostaly_czas: remainingTime,
                       status: "Zaktualizowano",
+                      ...(user?.role === "admin" && {
+                        nieprzeczytane_dla_uzytkownika: true,
+                      }),
                     };
 
                     // ➕ tylko jeśli admin, dodaj dane z zakończenia
@@ -1717,6 +1821,7 @@ export default function Reklamacje() {
                         pdfZakonczeniePath;
                       aktualizowaneDane.zalacznik_zakonczenie =
                         zalacznikZakonczenie;
+                      aktualizowaneDane.nieprzeczytane_dla_uzytkownika = true;
                     }
 
                     const { error } = await supabase
@@ -1855,7 +1960,7 @@ export default function Reklamacje() {
             <div className="flex justify-end mt-4">
               <button
                 className="bg-green-500 text-white px-4 py-2 rounded mr-2"
-                onClick={() => updateStatus(statusToUpdate.status)}
+                onClick={() => updateStatus(statusToUpdate)}
               >
                 Zapisz
               </button>

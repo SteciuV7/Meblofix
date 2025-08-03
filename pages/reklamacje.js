@@ -351,7 +351,7 @@ export default function Reklamacje() {
   async function archiveOldReklamacje() {
     try {
       const currentDate = new Date();
-      currentDate.setMonth(currentDate.getMonth() - 1); // Miesiąc wstecz
+      currentDate.setDate(currentDate.getDate() - 2);
       const formattedDate = currentDate.toISOString();
 
       const { error } = await supabase

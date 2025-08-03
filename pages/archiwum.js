@@ -284,6 +284,7 @@ export default function Reklamacje() {
             .single();
 
           if (userError) throw userError;
+
           setUser({
             ...user,
             role: userData.rola,
@@ -298,14 +299,14 @@ export default function Reklamacje() {
             ({ data, reklError } = await supabase
               .from("reklamacje")
               .select("*")
-              .eq("status", "Archiwum") // Tylko archiwum
+              .eq("status", "Archiwum")
               .order("data_zgloszenia", { ascending: false }));
           } else if (userData.firma_id) {
             ({ data, reklError } = await supabase
               .from("reklamacje")
               .select("*")
               .eq("firma_id", userData.firma_id)
-              .eq("status", "Archiwum") // Tylko archiwum
+              .eq("status", "Archiwum")
               .order("data_zgloszenia", { ascending: false }));
           }
 
@@ -315,7 +316,7 @@ export default function Reklamacje() {
           setFilteredReklamacje(data || []);
         }
 
-        // Pobranie firm (niezależnie od tego, czy jest użytkownik, czy nie)
+        // Pobranie firm
         const { data: firmyData, error: firmyError } = await supabase
           .from("firmy")
           .select("*");
@@ -332,51 +333,6 @@ export default function Reklamacje() {
 
     loadData();
   }, []);
-  useEffect(() => {
-    async function loadData() {
-      try {
-        // Pobranie użytkownika
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-        if (error) throw error;
-
-        if (user) {
-          const { data: userData, error: userError } = await supabase
-            .from("firmy")
-            .select("*")
-            .eq("email", user.email)
-            .single();
-
-          if (userError) throw userError;
-          setUser({
-            ...user,
-            role: userData.rola,
-            firma_id: userData.firma_id,
-          });
-
-          // Pobranie reklamacji dopiero po uzyskaniu danych użytkownika
-          await fetchReklamacje();
-        }
-
-        // Pobranie firm (niezależnie od tego, czy jest użytkownik, czy nie)
-        const { data: firmyData, error: firmyError } = await supabase
-          .from("firmy")
-          .select("*");
-
-        if (firmyError) throw firmyError;
-
-        setFirmy(firmyData);
-      } catch (error) {
-        console.error("Błąd ładowania danych:", error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadData();
-  });
 
   // 🔍 Wyszukiwanie i filtrowanie
   useEffect(() => {

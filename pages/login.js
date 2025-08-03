@@ -79,16 +79,11 @@ export default function Login() {
       </div>
 
       {/* Prawa sekcja: obraz — widoczna tylko na desktopie */}
-      <div className="hidden md:block w-1/2 relative">
-        <div className="absolute inset-0 bg-black opacity-30 z-10"></div>
-        <Image
-          src="/login-bg.webp"
-          alt="Tło logowania"
-          layout="fill"
-          objectFit="cover"
-          className="z-0"
-          unoptimized
-        />
+      <div
+        className="hidden md:block w-1/2 relative bg-cover bg-center"
+        style={{ backgroundImage: "url('/login-bg.webp')" }}
+      >
+        <div className="absolute inset-0 bg-black opacity-30"></div>
       </div>
     </div>
   );

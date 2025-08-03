@@ -27,9 +27,9 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen">
-      {/* Lewa sekcja */}
-      <div className="w-1/2 flex flex-col justify-center px-16 bg-gray-100">
+    <div className="flex flex-col md:flex-row md:h-screen">
+      {/* Lewa sekcja: formularz */}
+      <div className="w-full md:w-1/2 flex flex-col justify-center px-8 md:px-16 py-10 bg-gray-100 min-h-screen md:min-h-0">
         <h1 className="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-2">
           System reklamacji Meblofix
         </h1>
@@ -41,7 +41,6 @@ export default function Login() {
           Wpisz swój email oraz hasło, aby się zalogować.
         </p>
 
-        {/* Formularz logowania */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-gray-700">E-mail</label>
@@ -74,20 +73,20 @@ export default function Login() {
           </button>
         </form>
 
-        {/* Stopka */}
         <p className="mt-6 text-sm text-gray-500">
           © Powered by <span className="text-indigo-600 font-bold">CP&BS</span>.
         </p>
       </div>
 
-      {/* Prawa sekcja z obrazem */}
+      {/* Prawa sekcja: obraz — widoczna tylko na desktopie */}
       <div className="hidden md:block w-1/2 relative">
-        <div className="absolute inset-0 bg-black opacity-30"></div>
+        <div className="absolute inset-0 bg-black opacity-30 z-10"></div>
         <Image
           src="/login-bg.webp"
           alt="Tło logowania"
           layout="fill"
           objectFit="cover"
+          className="z-0"
         />
       </div>
     </div>

@@ -87,6 +87,7 @@ export default function Login() {
           layout="fill"
           objectFit="cover"
           className="z-0"
+          unoptimized
         />
       </div>
     </div>

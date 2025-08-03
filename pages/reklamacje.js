@@ -2112,7 +2112,7 @@ export default function Reklamacje() {
             <h2 className="text-xl font-bold mb-4 text-red-600">Uwaga!</h2>
             <p className="text-gray-800 mb-4">
               W jednej lub więcej Twoich reklamacji zostały wpisane błędne dane
-              adresowe. Prosimy o ich uzupełnienie, abymożliwe było poprawne
+              adresowe. Prosimy o ich uzupełnienie, aby możliwe było poprawne
               wyświetlenie na mapie. Polecamy przepisanie adresu z map Google.
             </p>
 

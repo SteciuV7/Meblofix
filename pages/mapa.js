@@ -25,12 +25,16 @@ const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
 export default function Mapa() {
   const [user, setUser] = useState(null);
   const [points, setPoints] = useState([]);
+  const isPointInRoute = (point) => routePoints.some((p) => p.id === point.id);
+  const [showRoutePanel, setShowRoutePanel] = useState(false);
   const [defaultIcon, setDefaultIcon] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedReklamacja, setSelectedReklamacja] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const router = useRouter();
+  const [routeMode, setRouteMode] = useState(false); // tryb zaznaczania punktów
+  const [routePoints, setRoutePoints] = useState([]); // punkty wybrane do trasy
   const [statystyki, setStatystyki] = useState({
     zapisane: 0,
     przetworzone: 0,
@@ -43,11 +47,11 @@ export default function Mapa() {
     if (typeof window === "undefined") return null;
 
     const colorMap = {
-      Zgłoszone: "yellow",
+      Zgłoszone: "red",
       Zaktualizowano: "orange",
-      "Oczekuje na informacje": "red",
+      "Oczekuje na informacje": "black",
       "Oczekuje na dostawę": "violet",
-      "W trakcie realizacji": "blue",
+      "W trakcie realizacji": "green",
     };
 
     const color = colorMap[status] || "blue";
@@ -128,7 +132,7 @@ export default function Mapa() {
       let bledy = 0;
 
       for (const rek of data) {
-        const fullAddress = `${rek.miejscowosc}, ${rek.kod_pocztowy} ${rek.adres}`;
+        const fullAddress = `${rek.kod_pocztowy} ${rek.miejscowosc}, ${rek.adres}`;
 
         if (rek.lat && rek.lon) {
           zapisane++;
@@ -229,7 +233,31 @@ export default function Mapa() {
 
       <div className="p-6">
         <h2 className="text-3xl font-bold mb-6 text-center">Mapa reklamacji</h2>
+        <div className="flex justify-between items-center mb-4">
+          <button
+            className={`px-4 py-2 rounded text-white ${
+              routeMode ? "bg-yellow-600" : "bg-gray-800"
+            } hover:bg-yellow-700`}
+            onClick={() => {
+              setRouteMode(!routeMode);
+              if (routeMode) {
+                setRoutePoints([]);
+                setShowRoutePanel(false); // ukryj panel przy wyłączeniu trybu
+              }
+            }}
+          >
+            {routeMode ? "Zakończ tryb trasy" : "Tryb trasy"}
+          </button>
 
+          {routeMode && (
+            <button
+              className="bg-indigo-700 text-white px-4 py-2 rounded hover:bg-indigo-800"
+              onClick={() => setShowRoutePanel((prev) => !prev)}
+            >
+              🧭 Trasa ({routePoints.length})
+            </button>
+          )}
+        </div>
         {loading && <p className="text-center">Ładowanie mapy...</p>}
 
         {!loading && points.length === 0 && (
@@ -261,8 +289,18 @@ export default function Mapa() {
                     <p>
                       <strong>Status:</strong> {point.status}
                     </p>
-                    <p>
+                    <p className="flex items-center gap-2">
                       <strong>Adres:</strong> {point.adres}
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(point.adres);
+                          alert("Adres skopiowany do schowka!");
+                        }}
+                        className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-200 transition"
+                        title="Skopiuj adres"
+                      >
+                        Kopiuj
+                      </button>
                     </p>
                     <p>
                       <strong>Termin realizacji:</strong>{" "}
@@ -298,6 +336,26 @@ export default function Mapa() {
                       >
                         Nawiguj
                       </button>
+
+                      {routeMode && (
+                        <button
+                          className={`px-3 py-1 rounded text-xs ${
+                            isPointInRoute(point)
+                              ? "bg-green-600 cursor-default"
+                              : "bg-yellow-500 hover:bg-yellow-600"
+                          } text-white transition`}
+                          onClick={() => {
+                            if (!isPointInRoute(point)) {
+                              setRoutePoints((prev) => [...prev, point]);
+                            }
+                          }}
+                          disabled={isPointInRoute(point)}
+                        >
+                          {isPointInRoute(point)
+                            ? "✅ Dodano"
+                            : "➕ Dodaj do trasy"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </Popup>
@@ -305,6 +363,100 @@ export default function Mapa() {
             ))}
           </MapWithNoSSR>
         )}
+        {routeMode && showRoutePanel && (
+          <div
+            className="fixed inset-0 flex justify-center items-center z-50 modal-preview overflow-y-auto"
+            style={{ background: "rgba(0, 0, 0, 0.4)" }}
+          >
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl mx-4 relative">
+              <h3 className="text-xl font-semibold mb-4">🧭 Punkty trasy</h3>
+
+              {routePoints.length === 0 && (
+                <p className="text-gray-500">Brak punktów.</p>
+              )}
+
+              <ul className="space-y-2">
+                {routePoints.map((point, index) => (
+                  <li
+                    key={index}
+                    className="flex items-center justify-between border-b pb-1"
+                  >
+                    <span>
+                      {index + 1}. {point.nazwa_firmy} - {point.adres}
+                    </span>
+                    <div className="flex gap-2">
+                      {index > 0 && (
+                        <button
+                          onClick={() => {
+                            const updated = [...routePoints];
+                            [updated[index - 1], updated[index]] = [
+                              updated[index],
+                              updated[index - 1],
+                            ];
+                            setRoutePoints(updated);
+                          }}
+                          className="flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm font-semibold"
+                        >
+                          ⬆️ Góra
+                        </button>
+                      )}
+
+                      {index < routePoints.length - 1 && (
+                        <button
+                          onClick={() => {
+                            const updated = [...routePoints];
+                            [updated[index + 1], updated[index]] = [
+                              updated[index],
+                              updated[index + 1],
+                            ];
+                            setRoutePoints(updated);
+                          }}
+                          className="flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm font-semibold"
+                        >
+                          ⬇️ Dół
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() =>
+                          setRoutePoints(
+                            routePoints.filter((_, i) => i !== index)
+                          )
+                        }
+                        className="flex items-center justify-center gap-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-semibold"
+                      >
+                        X
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {routePoints.length >= 1 && (
+                <a
+                  href={`https://www.google.com/maps/dir/My+Location/${routePoints
+                    .map((p) => encodeURIComponent(p.adres))
+                    .join("/")}`}
+                  target="_blank"
+                  className="mt-4 inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+                  rel="noopener noreferrer"
+                >
+                  Otwórz trasę w Google Maps
+                </a>
+              )}
+
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => setShowRoutePanel(false)}
+                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                >
+                  Zamknij
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isPreviewOpen && selectedReklamacja && (
           <div
             className="fixed inset-0 flex justify-center items-center z-50 modal-preview overflow-y-auto"

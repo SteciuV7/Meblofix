@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Clock } from "lucide-react";
 import Tippy from "@tippyjs/react";
 import "tippy.js/dist/tippy.css";
 import { Truck } from "lucide-react";
+import { geocodeAddress } from "../lib/geocode";
 
 export default function Reklamacje() {
   const [selectedReklamacja, setSelectedReklamacja] = useState(null);
@@ -30,6 +31,7 @@ export default function Reklamacje() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [potwierdzonoZapoznanie, setPotwierdzonoZapoznanie] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
+  const [showMissingDataPopup, setShowMissingDataPopup] = useState(false);
   let reklamacjaData = {};
   if (selectedReklamacja) {
     const { nr_reklamacji, ...restData } = selectedReklamacja;
@@ -57,6 +59,7 @@ export default function Reklamacje() {
   const [closeImagePreviews, setCloseImagePreviews] = useState([]);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusToUpdate, setStatusToUpdate] = useState(null);
+  const [reklamacjeZBledem, setReklamacjeZBledem] = useState([]);
   const handleEditStatus = (reklamacja) => {
     setStatusToUpdate(reklamacja);
     setIsStatusModalOpen(true);
@@ -512,6 +515,20 @@ export default function Reklamacje() {
           if (reklError) throw reklError;
 
           setReklamacje(data || []);
+          // Sprawdź, czy użytkownik ma reklamację bez współrzędnych
+          if (userData.rola !== "admin") {
+            const bledne = data.filter(
+              (r) =>
+                (r.lat == null || r.lon == null) &&
+                r.status !== "Zakończone" &&
+                r.status !== "Archiwum"
+            );
+
+            if (bledne.length > 0) {
+              setReklamacjeZBledem(bledne); // cała reklamacja, nie tylko ID
+              setShowMissingDataPopup(true);
+            }
+          }
           setFilteredReklamacje(data || []);
         }
 
@@ -1209,22 +1226,37 @@ export default function Reklamacje() {
                     const remainingTime =
                       calculateRemainingTime(realizacjaDate);
 
-                    const { error } = await supabase.from("reklamacje").insert([
-                      {
-                        ...newReklamacja,
-                        firma_id: user.firma_id, // Przypisujemy firmę
-                        zalacznik_pdf: pdfPath,
-                        zalacznik_zdjecia: imagePaths,
-                        data_zakonczenia: realizacjaDate.toISOString(),
-                        realizacja_do: realizacjaDate.toISOString(),
-                        pozostaly_czas: remainingTime,
-                        nieprzeczytane_dla_uzytkownika: true,
-                      },
-                    ]);
+                    const { data: inserted, error } = await supabase
+                      .from("reklamacje")
+                      .insert([
+                        {
+                          ...newReklamacja,
+                          firma_id: user.firma_id, // Przypisujemy firmę
+                          zalacznik_pdf: pdfPath,
+                          zalacznik_zdjecia: imagePaths,
+                          data_zakonczenia: realizacjaDate.toISOString(),
+                          realizacja_do: realizacjaDate.toISOString(),
+                          pozostaly_czas: remainingTime,
+                          nieprzeczytane_dla_uzytkownika: true,
+                        },
+                      ])
+                      .select(); // potrzebne żeby dostać ID
 
                     if (error) {
                       alert(error.message);
                     } else {
+                      // 🔍 pełny adres z pól
+                      const fullAddress = `${newReklamacja.miejscowosc}, ${newReklamacja.kod_pocztowy} ${newReklamacja.adres}`;
+                      const coords = await geocodeAddress(fullAddress);
+
+                      // 🧭 jeśli znaleziono współrzędne – zapisujemy je do tej nowo dodanej reklamacji
+                      if (coords && inserted && inserted.length > 0) {
+                        await supabase
+                          .from("reklamacje")
+                          .update({ lat: coords.lat, lon: coords.lon })
+                          .eq("id", inserted[0].id);
+                      }
+
                       alert("✅ Dodano reklamację!");
                       setShowAddModal(false);
                       location.reload();
@@ -1813,6 +1845,31 @@ export default function Reklamacje() {
                       }),
                     };
 
+                    // 🧠 Sprawdź, czy zmienił się adres → jeśli tak, wyzeruj współrzędne
+                    const { data: staraReklamacja, error: fetchError } =
+                      await supabase
+                        .from("reklamacje")
+                        .select("adres, miejscowosc, kod_pocztowy")
+                        .eq("id", selectedReklamacja.id)
+                        .single();
+
+                    if (fetchError) {
+                      alert("❌ Błąd pobierania danych z bazy");
+                      return;
+                    }
+
+                    const adresZmieniony =
+                      staraReklamacja.adres !== selectedReklamacja.adres ||
+                      staraReklamacja.miejscowosc !==
+                        selectedReklamacja.miejscowosc ||
+                      staraReklamacja.kod_pocztowy !==
+                        selectedReklamacja.kod_pocztowy;
+
+                    if (adresZmieniony) {
+                      aktualizowaneDane.lat = null;
+                      aktualizowaneDane.lon = null;
+                    }
+
                     // ➕ tylko jeśli admin, dodaj dane z zakończenia
                     if (user?.role === "admin") {
                       aktualizowaneDane.opis_przebiegu =
@@ -1832,6 +1889,17 @@ export default function Reklamacje() {
                     if (error) {
                       alert(error.message);
                     } else {
+                      if (!aktualizowaneDane.lat && !aktualizowaneDane.lon) {
+                        const fullAddress = `${selectedReklamacja.miejscowosc}, ${selectedReklamacja.kod_pocztowy} ${selectedReklamacja.adres}`;
+                        const coords = await geocodeAddress(fullAddress);
+
+                        if (coords) {
+                          await supabase
+                            .from("reklamacje")
+                            .update({ lat: coords.lat, lon: coords.lon })
+                            .eq("id", selectedReklamacja.id);
+                        }
+                      }
                       alert("✅ Zaktualizowano reklamację!");
                       setIsEditOpen(false);
                       location.reload();
@@ -2032,6 +2100,39 @@ export default function Reklamacje() {
                 Anuluj
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {showMissingDataPopup && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-50"
+          style={{ background: "rgba(0, 0, 0, 0.5)" }}
+        >
+          <div className="bg-white rounded-lg shadow-lg p-6 w-1/2 text-center">
+            <h2 className="text-xl font-bold mb-4 text-red-600">Uwaga!</h2>
+            <p className="text-gray-800 mb-4">
+              W jednej lub więcej Twoich reklamacji zostały wpisane błędne dane
+              adresowe. Prosimy o ich uzupełnienie, abymożliwe było poprawne
+              wyświetlenie na mapie. Polecamy przepisanie adresu z map Google.
+            </p>
+
+            {reklamacjeZBledem.length > 0 && (
+              <div className="mb-4 text-left text-sm">
+                <p className="font-semibold mb-2">Reklamacje do poprawy:</p>
+                <ul className="list-disc list-inside text-red-600">
+                  {reklamacjeZBledem.map((rek) => (
+                    <li key={rek.id}>Numer: {rek.numer_faktury}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <button
+              className="bg-red-600 text-white px-6 py-2 rounded"
+              onClick={() => setShowMissingDataPopup(false)}
+            >
+              Zamknij
+            </button>
           </div>
         </div>
       )}

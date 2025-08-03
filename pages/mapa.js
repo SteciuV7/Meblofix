@@ -1,15 +1,11 @@
-import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { supabase } from "../lib/supabase";
-import DatePicker from "react-datepicker";
 import { useRouter } from "next/router";
-import "react-datepicker/dist/react-datepicker.css";
-import { DateRange } from "react-date-range";
-import "react-date-range/dist/styles.css";
-import "react-date-range/dist/theme/default.css";
 import { FiLogOut } from "react-icons/fi";
+import Image from "next/image";
+import { useEffect, useState, useCallback } from "react";
 
-// Dynamiczne ładowanie komponentów Leaflet bez SSR
+// Dynamiczne komponenty Leaflet
 const MapWithNoSSR = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
@@ -28,41 +24,56 @@ const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
 
 export default function Mapa() {
   const [user, setUser] = useState(null);
-  const router = useRouter();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [points, setPoints] = useState([]);
   const [defaultIcon, setDefaultIcon] = useState(null);
-  const [dateRange, setDateRange] = useState([
-    {
-      startDate: new Date(),
-      endDate: new Date(),
-      key: "selection",
-    },
-  ]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [selectedReklamacja, setSelectedReklamacja] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const router = useRouter();
+  const [statystyki, setStatystyki] = useState({
+    zapisane: 0,
+    przetworzone: 0,
+    bledy: 0,
+  });
+
+  const [showPopup, setShowPopup] = useState(false);
+
+  const getColorIcon = (status) => {
+    if (typeof window === "undefined") return null;
+
+    const colorMap = {
+      Zgłoszone: "yellow",
+      Zaktualizowano: "orange",
+      "Oczekuje na informacje": "red",
+      "Oczekuje na dostawę": "violet",
+      "W trakcie realizacji": "blue",
+    };
+
+    const color = colorMap[status] || "blue";
+
+    const L = require("leaflet");
+
+    return new L.Icon({
+      iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png",
+      shadowSize: [41, 41],
+    });
+  };
+
   useEffect(() => {
-    async function loadUserData() {
-      try {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-        if (error) throw error;
-
-        if (user) {
-          setUser(user);
-        }
-      } catch (error) {
-        console.error("Błąd ładowania danych użytkownika:", error.message);
-      }
-    }
-
-    loadUserData();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUser(user);
+    });
   }, []);
+
   useEffect(() => {
-    async function loadLeaflet() {
-      if (typeof window !== "undefined") {
-        const L = await import("leaflet");
+    if (typeof window !== "undefined") {
+      import("leaflet").then((L) => {
         const icon = new L.Icon({
           iconUrl:
             "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
@@ -70,110 +81,99 @@ export default function Mapa() {
           iconAnchor: [12, 41],
         });
         setDefaultIcon(icon);
-      }
+        console.log("✅ Ikona ustawiona");
+      });
     }
-
-    loadLeaflet();
   }, []);
-  // Funkcja do geokodowania adresu za pomocą Nominatim
-  async function geocodeAddress(address) {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          address
-        )}`
-      );
-      const data = await response.json();
 
-      if (data.length > 0) {
-        console.log(
-          "Geokodowanie zakończone sukcesem dla adresu:",
-          address,
-          data[0]
-        );
-        return {
-          lat: parseFloat(data[0].lat),
-          lon: parseFloat(data[0].lon),
-        };
+  async function geocodeAddress(address) {
+    console.log("➡️ Geokoduję:", address);
+    const apiKey = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
+    try {
+      const res = await fetch(
+        `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
+          address
+        )}&key=${apiKey}&language=pl&countrycode=pl`
+      );
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const { lat, lng } = data.results[0].geometry;
+        return { lat, lon: lng };
       } else {
-        console.warn("Nie znaleziono współrzędnych dla adresu:", address);
+        console.warn("⚠️ Nie znaleziono adresu:", address);
         return null;
       }
-    } catch (error) {
-      console.error("Błąd geokodowania adresu:", error.message);
+    } catch (err) {
+      console.error("❌ Błąd geokodowania:", err);
       return null;
     }
   }
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
-  // Funkcja do pobrania reklamacji na podstawie daty trasy
-  async function fetchReklamacjeByRoute(startDate, endDate) {
-    try {
-      setLoading(true);
-      const formattedStartDate = startDate.toLocaleDateString("en-CA");
-      const formattedEndDate = endDate.toLocaleDateString("en-CA");
 
-      const { data: reklamacje, error } = await supabase
+  const fetchData = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
         .from("reklamacje")
-        .select("nazwa_firmy, miejscowosc, adres, opis, trasa, kod_pocztowy")
-        .gte("trasa", formattedStartDate)
-        .lte("trasa", formattedEndDate);
+        .select(
+          "id, nazwa_firmy, numer_faktury, kod_pocztowy, miejscowosc, adres, opis, pozostaly_czas, realizacja_do, informacje, informacje_od_zglaszajacego, zalacznik_pdf, zalacznik_zdjecia, zalacznik_pdf_zakonczenie, zalacznik_zakonczenie, opis_przebiegu, nieprzeczytane_dla_uzytkownika, status, trasa, lat, lon"
+        )
+        .not("status", "in", '("Zakończone","Archiwum")');
 
       if (error) throw error;
+      console.log("📦 Reklamacje:", data);
 
-      // Logowanie wyników zapytania
-      if (!reklamacje || reklamacje.length === 0) {
-        console.warn(
-          "Brak reklamacji w przedziale dat:",
-          formattedStartDate,
-          "-",
-          formattedEndDate
-        );
-      } else {
-        console.log(
-          "Reklamacje w przedziale dat:",
-          formattedStartDate,
-          "-",
-          formattedEndDate,
-          reklamacje
-        );
+      const pointsWithCoords = [];
+
+      let zapisane = 0;
+      let przetworzone = 0;
+      let bledy = 0;
+
+      for (const rek of data) {
+        const fullAddress = `${rek.miejscowosc}, ${rek.kod_pocztowy} ${rek.adres}`;
+
+        if (rek.lat && rek.lon) {
+          zapisane++;
+          pointsWithCoords.push({ ...rek, adres: fullAddress });
+          continue;
+        }
+
+        const coords = await geocodeAddress(fullAddress);
+
+        if (coords) {
+          przetworzone++;
+
+          await supabase
+            .from("reklamacje")
+            .update({ lat: coords.lat, lon: coords.lon })
+            .eq("id", rek.id);
+
+          pointsWithCoords.push({
+            ...rek,
+            lat: coords.lat,
+            lon: coords.lon,
+            adres: fullAddress,
+          });
+        } else {
+          bledy++;
+        }
       }
 
-      const mappedPoints = await Promise.all(
-        reklamacje.map(async (rek) => {
-          const fullAddress = `${rek.miejscowosc}, ${rek.kod_pocztowy} ${rek.adres}`;
-          const coordinates = await geocodeAddress(fullAddress);
-
-          if (coordinates) {
-            return {
-              lat: coordinates.lat,
-              lon: coordinates.lon,
-              title: rek.nazwa_firmy,
-              trasa: rek.trasa,
-              adres: fullAddress,
-            };
-          } else {
-            console.warn("Nie udało się zgeokodować adresu:", fullAddress);
-            return null;
-          }
-        })
-      );
-
-      // Filtrujemy null-e (gdy geokodowanie nie zwróciło współrzędnych)
-      setPoints(mappedPoints.filter((point) => point !== null));
+      setPoints(pointsWithCoords);
+      setStatystyki({ zapisane, przetworzone, bledy });
+      setShowPopup(true); // pokaż popup po zakończeniu
     } catch (error) {
-      console.error("Błąd ładowania reklamacji:", error.message);
+      console.error("❌ Błąd Supabase:", error.message);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  // Obsługa zmiany daty
-  const handleDateChange = (range) => {
-    setDateRange([range]);
-    fetchReklamacjeByRoute(range.startDate, range.endDate);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
   };
 
   return (
@@ -207,60 +207,208 @@ export default function Mapa() {
           )}
         </div>
       </header>
-      <div className="min-h-screen bg-gray-100 text-gray-900 p-4">
-        <h2 className="text-3xl font-bold mb-4 text-center">Mapa reklamacji</h2>
 
-        {/* Wybór daty trasy */}
-        <div className="flex justify-center mb-6">
-          <DateRange
-            editableDateInputs={true}
-            onChange={(ranges) => handleDateChange(ranges.selection)}
-            moveRangeOnFirstSelection={false}
-            ranges={dateRange}
-          />
+      {showPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-96 text-center">
+            <h3 className="text-xl font-semibold mb-4">
+              Podsumowanie geokodowania
+            </h3>
+            <p className="mb-2">✅ Zapisane: {statystyki.zapisane}</p>
+            <p className="mb-2">🔄 Przetworzone: {statystyki.przetworzone}</p>
+            <p className="mb-2">❌ Błędy: {statystyki.bledy}</p>
+            <button
+              className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+              onClick={() => setShowPopup(false)}
+            >
+              Zamknij
+            </button>
+          </div>
         </div>
+      )}
+
+      <div className="p-6">
+        <h2 className="text-3xl font-bold mb-6 text-center">Mapa reklamacji</h2>
 
         {loading && <p className="text-center">Ładowanie mapy...</p>}
 
-        {/* Mapa pojawia się dopiero po wybraniu daty */}
-        {points.length > 0 && defaultIcon && (
+        {!loading && points.length === 0 && (
+          <p className="text-center">Brak reklamacji do wyświetlenia.</p>
+        )}
+
+        {!showPopup && points.length > 0 && (
           <MapWithNoSSR
             center={[52.2297, 21.0122]}
             zoom={6}
-            style={{ height: "80vh", width: "100%" }}
+            style={{ height: "80vh", width: "100%", zIndex: 0 }}
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
-            {points.map((point, index) => (
+
+            {points.map((point, idx) => (
               <Marker
-                key={index}
+                key={idx}
                 position={[point.lat, point.lon]}
-                icon={defaultIcon}
+                icon={getColorIcon(point.status)}
               >
                 <Popup>
-                  <b>{point.title}</b>
-                  <p>{point.opis}</p>
-                  <p>
-                    <strong>Adres:</strong> {point.adres}
-                  </p>
-                  {point.trasa && (
+                  <div className="text-sm space-y-1">
                     <p>
-                      <strong>Trasa:</strong> {point.trasa}
+                      <strong>Firma:</strong> {point.nazwa_firmy}
                     </p>
-                  )}
+                    <p>
+                      <strong>Status:</strong> {point.status}
+                    </p>
+                    <p>
+                      <strong>Adres:</strong> {point.adres}
+                    </p>
+                    <p>
+                      <strong>Termin realizacji:</strong>{" "}
+                      {point.realizacja_do?.split("T")[0]}
+                    </p>
+                    <p>
+                      <strong>Numer reklamacji:</strong> {point.numer_faktury}
+                    </p>
+                    <p>
+                      <strong>Opis:</strong> {point.opis}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+                        onClick={() => {
+                          setSelectedReklamacja(point);
+                          setIsPreviewOpen(true);
+                        }}
+                      >
+                        Podgląd
+                      </button>
+                      <button
+                        onClick={() =>
+                          window.open(
+                            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              point.adres
+                            )}`,
+                            "_blank"
+                          )
+                        }
+                        className="bg-gray-700 text-white px-3 py-1 rounded text-xs hover:bg-gray-800 transition"
+                      >
+                        Nawiguj
+                      </button>
+                    </div>
+                  </div>
                 </Popup>
               </Marker>
             ))}
           </MapWithNoSSR>
         )}
+        {isPreviewOpen && selectedReklamacja && (
+          <div
+            className="fixed inset-0 flex justify-center items-center z-50 modal-preview overflow-y-auto"
+            style={{ background: "rgba(0, 0, 0, 0.4)" }}
+          >
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl mx-4 relative">
+              <h3 className="text-xl font-semibold mb-4">Podgląd reklamacji</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p>
+                    <strong>Nazwa firmy:</strong>{" "}
+                    {selectedReklamacja.nazwa_firmy}
+                  </p>
+                  <p>
+                    <strong>Numer reklamacji:</strong>{" "}
+                    {selectedReklamacja.numer_faktury}
+                  </p>
+                  <p>
+                    <strong>Kod pocztowy:</strong>{" "}
+                    {selectedReklamacja.kod_pocztowy}
+                  </p>
+                  <p>
+                    <strong>Miejscowość:</strong>{" "}
+                    {selectedReklamacja.miejscowosc}
+                  </p>
+                  <p>
+                    <strong>Adres:</strong> {selectedReklamacja.adres}
+                  </p>
+                  <p className="break-words whitespace-pre-wrap">
+                    <strong>Opis:</strong> {selectedReklamacja.opis}
+                  </p>
+                  <p>
+                    <strong>Termin realizacji:</strong>{" "}
+                    {new Date(
+                      selectedReklamacja.realizacja_do
+                    ).toLocaleDateString()}
+                  </p>
+                  <p>
+                    <strong>Pozostały czas:</strong>{" "}
+                    {selectedReklamacja.pozostaly_czas} dni
+                  </p>
+                  <p>
+                    <strong>Informacje od zgłaszającego:</strong>{" "}
+                    {selectedReklamacja.informacje_od_zglaszajacego}
+                  </p>
+                  <p className="break-words whitespace-pre-wrap">
+                    <strong>Informacje od Meblofix:</strong>{" "}
+                    {selectedReklamacja.informacje}
+                  </p>
+                </div>
+                <div>
+                  {selectedReklamacja.zalacznik_pdf && (
+                    <>
+                      <p>
+                        <strong>Załącznik PDF:</strong>
+                      </p>
+                      <a
+                        href={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${selectedReklamacja.zalacznik_pdf}`}
+                        target="_blank"
+                        className="text-blue-500 underline"
+                      >
+                        Otwórz PDF
+                      </a>
+                    </>
+                  )}
 
-        {/* Komunikat, gdy nie ma punktów na daną datę */}
-        {dateRange && points.length === 0 && !loading && (
-          <p className="text-center">
-            Brak reklamacji na wybrany przedział dat.
-          </p>
+                  {selectedReklamacja.zalacznik_zdjecia?.length > 0 && (
+                    <>
+                      <p className="mt-4">
+                        <strong>Załączniki zdjęciowe:</strong>
+                      </p>
+                      <div className="flex overflow-x-auto space-x-2 mt-1 w-full max-w-full">
+                        {selectedReklamacja.zalacznik_zdjecia.map(
+                          (img, index) => (
+                            <Image
+                              key={index}
+                              src={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`}
+                              alt="Załącznik"
+                              width={80}
+                              height={80}
+                              className="h-20 w-20 object-cover rounded flex-shrink-0"
+                              unoptimized
+                            />
+                          )
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-4">
+                <button
+                  className="bg-red-500 text-white px-4 py-2 rounded"
+                  onClick={async () => {
+                    setIsPreviewOpen(false);
+                    setSelectedReklamacja(null);
+                  }}
+                >
+                  Zamknij
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

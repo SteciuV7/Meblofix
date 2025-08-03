@@ -85,14 +85,14 @@ export default function Dashboard() {
       link: "/trasy",
       adminOnly: true,
       icon: <FaCar size={32} className="text-gray-700" />,
-    },
+    },*/
     {
       name: "Mapa",
       description:
         "Przeglądaj reklamacje dodane do wybranej trasy na interaktywnej mapie.",
       link: "/mapa",
       icon: <FaGlobe size={32} className="text-gray-700" />,
-    },*/
+    },
   ];
 
   return (

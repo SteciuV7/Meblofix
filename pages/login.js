@@ -29,7 +29,7 @@ export default function Login() {
   return (
     <div className="flex flex-col md:flex-row h-screen">
       {/* Lewa sekcja */}
-      <div className="w-full md:w-1/2 flex flex-col justify-center px-8 md:px-16 py-10 bg-gray-100">
+      <div className="w-1/2 flex flex-col justify-center px-16 bg-gray-100">
         <h1 className="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-2">
           System reklamacji Meblofix
         </h1>
@@ -81,7 +81,7 @@ export default function Login() {
       </div>
 
       {/* Prawa sekcja z obrazem */}
-      <div className="w-full md:w-1/2 relative h-64 md:h-auto">
+      <div className="hidden md:block w-1/2 relative">
         <div className="absolute inset-0 bg-black opacity-30"></div>
         <Image
           src="/login-bg.webp"

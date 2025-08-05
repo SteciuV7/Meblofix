@@ -91,20 +91,61 @@ export default function Mapa() {
   }, []);
 
   async function geocodeAddress(address) {
-    console.log("➡️ Geokoduję:", address);
+    const normalizeAddress = (addr) => {
+      const abbreviationMap = {
+        "gen.": "Generała",
+        gen: "Generała",
+        "dr.": "Doktora",
+        dr: "Doktora",
+        "ks.": "Księdza",
+        ks: "Księdza",
+        "św.": "Świętego",
+        św: "Świętego",
+        "prof.": "Profesora",
+        prof: "Profesora",
+      };
+
+      // Zamiana popularnych skrótów
+      Object.entries(abbreviationMap).forEach(([abbr, full]) => {
+        const regex = new RegExp(`\\b${abbr}\\b`, "gi");
+        addr = addr.replace(regex, full);
+      });
+
+      // Czyszczenie i standaryzacja
+      return addr
+        .replace(/\bul\.?\s*/gi, "") // usuń "ul.", "UL", "ul " itd.
+        .replace(/\blok\.?\s*/gi, "") // usuń "lok.", "lok", itp.
+        .replace(/\bm(\d+)\b/gi, "/$1") // zamień "m36" → "/36"
+        .replace(/\s+/g, " ") // zamień wiele spacji na jedną
+        .trim(); // usuń spacje z początku/końca
+    };
+
+    const cleanedAddress = normalizeAddress(address);
+
+    console.log("✍️ Adres przed:", address);
+    console.log("✅ Adres po czyszczeniu:", cleanedAddress);
+
     const apiKey = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
+    if (!apiKey) {
+      console.error(
+        "❌ Brak klucza API. Sprawdź zmienną NEXT_PUBLIC_OPENCAGE_API_KEY."
+      );
+      return null;
+    }
+
     try {
       const res = await fetch(
         `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
-          address
+          cleanedAddress
         )}&key=${apiKey}&language=pl&countrycode=pl`
       );
       const data = await res.json();
+
       if (data.results && data.results.length > 0) {
         const { lat, lng } = data.results[0].geometry;
         return { lat, lon: lng };
       } else {
-        console.warn("⚠️ Nie znaleziono adresu:", address);
+        console.warn("⚠️ Nie znaleziono adresu:", cleanedAddress);
         return null;
       }
     } catch (err) {

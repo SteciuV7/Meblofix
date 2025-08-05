@@ -2113,8 +2113,41 @@ export default function Reklamacje() {
             <p className="text-gray-800 mb-4">
               W jednej lub więcej Twoich reklamacji zostały wpisane błędne dane
               adresowe. Prosimy o ich uzupełnienie, aby możliwe było poprawne
-              wyświetlenie na mapie. Polecamy przepisanie adresu z map Google.
+              wyświetlenie na mapie.{" "}
+              <b>Polecamy przepisanie adresu z map Google.</b>
             </p>
+
+            <p className="text-gray-800 mb-2 font-semibold">
+              Najczęstsze błędy w adresach:
+            </p>
+            <ul className="list-disc list-inside text-gray-800 mb-4 text-sm">
+              <li>
+                <span className="font-medium">m36 / lok 36</span> zamiast{" "}
+                <span className="font-medium">/36</span> (np.{" "}
+                <i>Obrońców m36</i> → <b>Obrońców 6/36</b>)
+              </li>
+              <li>
+                <span className="font-medium">
+                  Brak numeru budynku lub mieszkania
+                </span>{" "}
+                (np. <i>Polna</i> → <b>Polna 6A</b>)
+              </li>
+              <li>
+                <span className="font-medium">Użycie skrótu „ul.”</span> (np.{" "}
+                <i>ul. Nowa 18</i> → <b>Nowa 18</b>)
+              </li>
+              <li>
+                <span className="font-medium">Skrócone nazwy ulic</span> (np.{" "}
+                <i>gen. Andersa</i> → <b>Generała Andersa</b>)
+              </li>
+              <li>
+                <span className="font-medium">
+                  Użycie dużych liter w całym adresie
+                </span>{" "}
+                (np. <i>DULCZA WIELKA, UL.NOWA 18</i> →{" "}
+                <b>Dulcza Wielka, Nowa 18</b>)
+              </li>
+            </ul>
 
             {reklamacjeZBledem.length > 0 && (
               <div className="mb-4 text-left text-sm">

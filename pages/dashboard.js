@@ -100,10 +100,11 @@ export default function Dashboard() {
       {/* Nagłówek */}
       <header className="bg-gray-900 text-white py-5 px-8 flex justify-between items-center shadow-lg">
         <h1
-          className="text-2xl font-bold cursor-pointer hover:text-gray-300 transition"
+          className="text-2xl font-bold cursor-pointer hover:text-gray-300 transition flex items-baseline space-x-2"
           onClick={() => router.push("/dashboard")}
         >
-          Meblofix Sp. z o.o.
+          <span>Meblofix Sp. z o.o.</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 6.50</span>
         </h1>
 
         {/* Informacje o użytkowniku */}

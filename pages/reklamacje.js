@@ -351,7 +351,7 @@ export default function Reklamacje() {
   async function archiveOldReklamacje() {
     try {
       const currentDate = new Date();
-      currentDate.setDate(currentDate.getDate() - 2);
+      currentDate.setDate(currentDate.getDate() - 7);
       const formattedDate = currentDate.toISOString();
 
       const { error } = await supabase
@@ -616,10 +616,11 @@ export default function Reklamacje() {
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <header className="bg-gray-900 text-white py-5 px-8 flex justify-between items-center shadow-lg">
         <h1
-          className="text-2xl font-bold cursor-pointer hover:text-gray-300 transition"
+          className="text-2xl font-bold cursor-pointer hover:text-gray-300 transition flex items-baseline space-x-2"
           onClick={() => router.push("/dashboard")}
         >
-          Meblofix Sp. z o.o.
+          <span>Meblofix Sp. z o.o.</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 6.50</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">

@@ -93,31 +93,25 @@ export default function Mapa() {
   async function geocodeAddress(address) {
     const normalizeAddress = (addr) => {
       const abbreviationMap = {
-        "gen.": "Generała",
-        gen: "Generała",
-        "dr.": "Doktora",
-        dr: "Doktora",
-        "ks.": "Księdza",
-        ks: "Księdza",
-        "św.": "Świętego",
-        św: "Świętego",
-        "prof.": "Profesora",
-        prof: "Profesora",
+        "gen\\.": "Generała",
+        "dr\\.": "Doktora",
+        "ks\\.": "Księdza",
+        "św\\.": "Świętego",
+        "prof\\.": "Profesora",
       };
 
-      // Zamiana popularnych skrótów
+      // Zamiana tylko samodzielnych skrótów, NIE fragmentów wyrazów (np. nie "Książąt")
       Object.entries(abbreviationMap).forEach(([abbr, full]) => {
-        const regex = new RegExp(`\\b${abbr}\\b`, "gi");
-        addr = addr.replace(regex, full);
+        const regex = new RegExp(`(^|\\s)${abbr}(?=\\s)`, "gi");
+        addr = addr.replace(regex, `$1${full}`);
       });
 
-      // Czyszczenie i standaryzacja
       return addr
-        .replace(/\bul\.?\s*/gi, "") // usuń "ul.", "UL", "ul " itd.
-        .replace(/\blok\.?\s*/gi, "") // usuń "lok.", "lok", itp.
-        .replace(/\bm(\d+)\b/gi, "/$1") // zamień "m36" → "/36"
-        .replace(/\s+/g, " ") // zamień wiele spacji na jedną
-        .trim(); // usuń spacje z początku/końca
+        .replace(/\bul\.?/gi, "ulica")
+        .replace(/\blok\.?/gi, "lokal")
+        .replace(/\bm(\d+)\b/gi, "/$1")
+        .replace(/\s+/g, " ")
+        .trim();
     };
 
     const cleanedAddress = normalizeAddress(address);

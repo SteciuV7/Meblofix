@@ -381,7 +381,7 @@ export default function Reklamacje() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 6.50</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 7.00</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">
@@ -616,7 +616,7 @@ export default function Reklamacje() {
       </div>
       {isPreviewOpen && selectedReklamacja && (
         <div
-          className="fixed inset-0 flex justify-center items-center z-50 modal-preview"
+          className="fixed inset-0 flex justify-center items-center z-50 modal-preview overflow-y-auto"
           style={{ background: "rgba(0, 0, 0, 0.4)" }}
         >
           <div className="bg-white rounded-lg shadow-lg p-6 w-2/3 relative">
@@ -627,7 +627,7 @@ export default function Reklamacje() {
                   <strong>Nazwa firmy:</strong> {selectedReklamacja.nazwa_firmy}
                 </p>
                 <p>
-                  <strong>Numer faktury:</strong>{" "}
+                  <strong>Numer reklamacji:</strong>{" "}
                   {selectedReklamacja.numer_faktury}
                 </p>
                 <p>
@@ -662,6 +662,7 @@ export default function Reklamacje() {
                   {selectedReklamacja.informacje}
                 </p>
               </div>
+
               <div>
                 <p>
                   <strong>Załącznik PDF:</strong>
@@ -709,32 +710,54 @@ export default function Reklamacje() {
                   </>
                 )}
 
-                <p className="mt-4">
-                  <strong>Zdjęcia zwrotne:</strong>
-                </p>
-                <div className="flex overflow-x-auto space-x-2 mt-1 max-w-full">
-                  {selectedReklamacja.zalacznik_zakonczenie?.map(
-                    (img, index) => (
-                      <Image
-                        key={index}
-                        src={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`}
-                        alt="Załącznik zakończenia"
-                        width={80}
-                        height={80}
-                        className="h-20 w-20 object-cover rounded cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleImageClick(
-                            `https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`
-                          );
-                        }}
-                        unoptimized
-                      />
-                    )
-                  )}
-                </div>
+                {/* PDF po zakończeniu */}
+                {selectedReklamacja.zalacznik_pdf_zakonczenie && (
+                  <>
+                    <p className="mt-4">
+                      <strong>PDF po zakończeniu:</strong>
+                    </p>
+                    <a
+                      href={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${selectedReklamacja.zalacznik_pdf_zakonczenie}`}
+                      target="_blank"
+                      className="text-blue-500 underline"
+                    >
+                      Otwórz PDF
+                    </a>
+                  </>
+                )}
+
+                {/* Zdjęcia zwrotne */}
+                {selectedReklamacja.zalacznik_zakonczenie?.length > 0 && (
+                  <>
+                    <p className="mt-4">
+                      <strong>Zdjęcia zwrotne:</strong>
+                    </p>
+                    <div className="flex overflow-x-auto space-x-2 mt-1 max-w-full">
+                      {selectedReklamacja.zalacznik_zakonczenie.map(
+                        (img, index) => (
+                          <Image
+                            key={index}
+                            src={`https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`}
+                            alt="Załącznik zakończenia"
+                            width={80}
+                            height={80}
+                            className="h-20 w-20 object-cover rounded cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleImageClick(
+                                `https://dpqfpqxgzpkhpulbiype.supabase.co/storage/v1/object/public/reklamacje/${img}`
+                              );
+                            }}
+                            unoptimized
+                          />
+                        )
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
+
             <div className="flex justify-end mt-4">
               <button
                 className="bg-red-500 text-white px-4 py-2 rounded"
@@ -746,6 +769,7 @@ export default function Reklamacje() {
           </div>
         </div>
       )}
+
       {isCloseOpen && selectedReklamacja && (
         <div
           className="fixed inset-0 flex justify-center items-center z-50"

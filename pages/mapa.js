@@ -107,7 +107,7 @@ export default function Mapa() {
       });
 
       return addr
-        .replace(/\bul\.?/gi, "ulica")
+        .replace(/\bul\.?(?=\s|$)(?!ica)/gi, "ulica")
         .replace(/\blok\.?/gi, "lokal")
         .replace(/\bm(\d+)\b/gi, "/$1")
         .replace(/\s+/g, " ")
@@ -223,7 +223,7 @@ export default function Mapa() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 6.50</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 7.00</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">

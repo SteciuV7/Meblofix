@@ -138,6 +138,14 @@ export default function Reklamacje() {
     return remainingDays > 0 ? remainingDays : 0;
   }
 
+  function hasGeoError(r) {
+    return (
+      (r.lat == null || r.lon == null) &&
+      r.status !== "Zakończone" &&
+      r.status !== "Archiwum"
+    );
+  }
+
   function handleImageClick(imageUrl) {
     setZoomedImage(imageUrl);
   }
@@ -568,8 +576,14 @@ export default function Reklamacje() {
           (filterStatus ? r.status === filterStatus : true)
       )
       .sort((a, b) => {
+        // 1) Najpierw błędy geokodowania
+        const aErr = hasGeoError(a);
+        const bErr = hasGeoError(b);
+        if (aErr && !bErr) return -1;
+        if (!aErr && bErr) return 1;
+
+        // 2) (tylko u zwykłego użytkownika) — najpierw nieprzeczytane
         if (user?.role !== "admin") {
-          // Najpierw nieprzeczytane
           if (
             a.nieprzeczytane_dla_uzytkownika &&
             !b.nieprzeczytane_dla_uzytkownika
@@ -581,7 +595,8 @@ export default function Reklamacje() {
           )
             return 1;
         }
-        // W innym wypadku sortuj po dacie zgłoszenia malejąco
+
+        // 3) Potem data zgłoszenia malejąco
         return new Date(b.data_zgloszenia) - new Date(a.data_zgloszenia);
       });
 
@@ -717,25 +732,27 @@ export default function Reklamacje() {
               {(filteredReklamacje || []).map((r) => (
                 <tr
                   key={r.id}
-                  className={`transition ${
-                    user?.role !== "admin" && r.nieprzeczytane_dla_uzytkownika
-                      ? `${
-                          r.status === "Zgłoszone"
-                            ? "bg-yellow-200/80"
-                            : r.status === "Zakończone"
-                            ? "bg-green-200/80"
-                            : r.status === "W trakcie realizacji"
-                            ? "bg-blue-200/80"
-                            : r.status === "Oczekuje na informacje"
-                            ? "bg-red-200/80"
-                            : r.status === "Oczekuje na dostawę"
-                            ? "bg-purple-200/80"
-                            : r.status === "Zaktualizowano"
-                            ? "bg-orange-200/80"
-                            : "bg-gray-200/80"
-                        }`
-                      : ""
-                  }`}
+                  className={`transition rounded-lg
+    ${hasGeoError(r) ? "bg-red-500/80" : ""}
+    ${
+      user?.role !== "admin" && r.nieprzeczytane_dla_uzytkownika
+        ? `${
+            r.status === "Zgłoszone"
+              ? "bg-yellow-200/80"
+              : r.status === "Zakończone"
+              ? "bg-green-200/80"
+              : r.status === "W trakcie realizacji"
+              ? "bg-blue-200/80"
+              : r.status === "Oczekuje na informacje"
+              ? "bg-red-200/80"
+              : r.status === "Oczekuje na dostawę"
+              ? "bg-purple-200/80"
+              : r.status === "Zaktualizowano"
+              ? "bg-orange-200/80"
+              : "bg-gray-200/80"
+          }`
+        : ""
+    }`}
                 >
                   {/*user?.role === "admin" && (
                     <td className="p-2 text-center">
@@ -867,25 +884,33 @@ export default function Reklamacje() {
                       user?.role === "admin" && handleEditStatus(r)
                     }
                   >
-                    <span
-                      className={`px-3 py-1 rounded-full text-white text-sm font-semibold ${
-                        r.status === "Zgłoszone"
-                          ? "bg-yellow-500"
-                          : r.status === "Zakończone"
-                          ? "bg-green-500"
-                          : r.status === "W trakcie realizacji"
-                          ? "bg-blue-500"
-                          : r.status === "Oczekuje na dostawę"
-                          ? "bg-purple-500"
-                          : r.status === "Oczekuje na informacje"
-                          ? "bg-red-500"
-                          : r.status === "Zaktualizowano"
-                          ? "bg-orange-500"
-                          : "bg-gray-500"
-                      } hover:opacity-80 transition`}
-                    >
-                      {r.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-3 py-1 rounded-full text-white text-sm font-semibold ${
+                          r.status === "Zgłoszone"
+                            ? "bg-yellow-500"
+                            : r.status === "Zakończone"
+                            ? "bg-green-500"
+                            : r.status === "W trakcie realizacji"
+                            ? "bg-blue-500"
+                            : r.status === "Oczekuje na dostawę"
+                            ? "bg-purple-500"
+                            : r.status === "Oczekuje na informacje"
+                            ? "bg-red-500"
+                            : r.status === "Zaktualizowano"
+                            ? "bg-orange-500"
+                            : "bg-gray-500"
+                        }`}
+                      >
+                        {r.status}
+                      </span>
+
+                      {hasGeoError(r) && (
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded bg-red-100 text-red-700 border border-red-300">
+                          Błędny adres
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="p-2">
                     <button

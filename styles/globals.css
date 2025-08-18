@@ -1,0 +1,131 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+td,
+th {
+  padding: 8px;
+  text-align: left;
+  white-space: nowrap; /* Zapobiega zawijaniu tekstu */
+  overflow: hidden; /* Ukrywa nadmiar tekstu */
+  text-overflow: ellipsis; /* Dodaje "..." gdy tekst się nie mieści */
+  max-width: 200px; /* Opcjonalnie: ogranicza szerokość kolumny */
+}
+.flex {
+  display: flex;
+  gap: 0.5rem;
+}
+.overflow-x-auto {
+  overflow-x: auto;
+}
+.space-x-2 > *:not(:last-child) {
+  margin-right: 0.5rem;
+}
+.max-w-xs {
+  max-width: 150px; /* Można dostosować */
+}
+.popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+}
+
+.popup img {
+  max-width: 90vw; /* Maksymalna szerokość to 90% ekranu */
+  max-height: 90vh; /* Maksymalna wysokość to 90% ekranu */
+  object-fit: contain; /* Zachowanie proporcji */
+  border-radius: 8px;
+}
+
+.popup button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background-color: red;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.popup-image {
+  z-index: 60; /* Wyższy niż modal podglądu */
+}
+
+.modal-preview {
+  z-index: 50; /* Mniejszy niż pop-up zdjęcia */
+}
+/* Dodaj te klasy do swojego globalnego CSS lub w komponencie */
+@media (max-width: 640px) {
+  .table-container {
+    padding: 0.5rem;
+  }
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+  .table-responsive th,
+  .table-responsive td {
+    padding: 0.5rem;
+  }
+  .button-responsive {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+}
+@media (max-width: 640px) {
+  .button-responsive {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+
+  .table-responsive th,
+  .table-responsive td {
+    padding: 0.5rem;
+  }
+}
+.break-words {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.whitespace-pre-wrap {
+  white-space: pre-wrap;
+}

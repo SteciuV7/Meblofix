@@ -1,0 +1,37 @@
+{
+  "name": "meblofix",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/auth-helpers-react": "^0.5.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "@tippyjs/react": "^4.2.6",
+    "autoprefixer": "^10.4.21",
+    "browser-image-compression": "^2.0.2",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.483.0",
+    "next": "^15.3.2",
+    "postcss": "^8.5.3",
+    "react": "^19.0.0",
+    "react-date-range": "^2.0.1",
+    "react-datepicker": "^8.2.1",
+    "react-dom": "^19.0.0",
+    "react-dropzone": "^14.3.8",
+    "react-icons": "^5.5.0",
+    "react-leaflet": "^5.0.0",
+    "react-toastify": "^11.0.5"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "15.2.2",
+    "tailwindcss": "^4.0.14"
+  }
+}

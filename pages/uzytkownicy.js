@@ -225,7 +225,7 @@ export default function Users() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 7.50</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 8.00</span>
         </h1>
 
         <div className="relative">

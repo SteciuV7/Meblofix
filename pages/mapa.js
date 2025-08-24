@@ -114,7 +114,8 @@ export default function Mapa() {
     }
   }, []);
 
-  async function geocodeAddress(address) {
+  async function geocodeAddress(addressRaw) {
+    // 🔧 normalizacja: rozwijanie skrótów, poprawki "ul.", "lok.", itp.
     const normalizeAddress = (addr) => {
       const abbreviationMap = {
         "gen\\.": "Generała",
@@ -124,7 +125,7 @@ export default function Mapa() {
         "prof\\.": "Profesora",
       };
 
-      // Zamiana tylko samodzielnych skrótów, NIE fragmentów wyrazów (np. nie "Książąt")
+      // zamiana tylko samodzielnych skrótów (nie części innych słów)
       Object.entries(abbreviationMap).forEach(([abbr, full]) => {
         const regex = new RegExp(`(^|\\s)${abbr}(?=\\s)`, "gi");
         addr = addr.replace(regex, `$1${full}`);
@@ -138,15 +139,15 @@ export default function Mapa() {
         .trim();
     };
 
-    const cleanedAddress = normalizeAddress(address);
+    const cleanedAddress = normalizeAddress(addressRaw);
 
-    console.log("✍️ Adres przed:", address);
+    console.log("✍️ Adres przed:", addressRaw);
     console.log("✅ Adres po czyszczeniu:", cleanedAddress);
 
     const apiKey = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
     if (!apiKey) {
       console.error(
-        "❌ Brak klucza API. Sprawdź zmienną NEXT_PUBLIC_OPENCAGE_API_KEY."
+        "❌ Brak klucza API. Sprawdź NEXT_PUBLIC_OPENCAGE_API_KEY."
       );
       return null;
     }
@@ -155,12 +156,13 @@ export default function Mapa() {
       const res = await fetch(
         `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
           cleanedAddress
-        )}&key=${apiKey}&language=pl&countrycode=pl`
+        )}&key=${apiKey}&language=pl&countrycode=pl&limit=1&no_annotations=1`
       );
       const data = await res.json();
 
       if (data.results && data.results.length > 0) {
         const { lat, lng } = data.results[0].geometry;
+        // ⚠️ pilnujemy kolejności — Leaflet chce [lat, lon]
         return { lat, lon: lng };
       } else {
         console.warn("⚠️ Nie znaleziono adresu:", cleanedAddress);
@@ -247,7 +249,7 @@ export default function Mapa() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 7.50</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 8.00</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">

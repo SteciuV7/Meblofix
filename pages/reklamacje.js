@@ -635,7 +635,7 @@ export default function Reklamacje() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 8.00</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 8.10</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">

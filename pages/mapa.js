@@ -114,8 +114,9 @@ export default function Mapa() {
     }
   }, []);
 
+  // w mapa.js – PODMIANKA funkcji 1:1 (zostaje ta sama sygnatura)
   async function geocodeAddress(addressRaw) {
-    // 🔧 normalizacja: rozwijanie skrótów, poprawki "ul.", "lok.", itp.
+    // --- normalizacja jak było ---
     const normalizeAddress = (addr) => {
       const abbreviationMap = {
         "gen\\.": "Generała",
@@ -124,13 +125,10 @@ export default function Mapa() {
         "św\\.": "Świętego",
         "prof\\.": "Profesora",
       };
-
-      // zamiana tylko samodzielnych skrótów (nie części innych słów)
       Object.entries(abbreviationMap).forEach(([abbr, full]) => {
         const regex = new RegExp(`(^|\\s)${abbr}(?=\\s)`, "gi");
         addr = addr.replace(regex, `$1${full}`);
       });
-
       return addr
         .replace(/\bul\.?(?=\s|$)(?!ica)/gi, "ulica")
         .replace(/\blok\.?/gi, "lokal")
@@ -140,7 +138,6 @@ export default function Mapa() {
     };
 
     const cleanedAddress = normalizeAddress(addressRaw);
-
     console.log("✍️ Adres przed:", addressRaw);
     console.log("✅ Adres po czyszczeniu:", cleanedAddress);
 
@@ -152,24 +149,138 @@ export default function Mapa() {
       return null;
     }
 
-    try {
-      const res = await fetch(
-        `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
-          cleanedAddress
-        )}&key=${apiKey}&language=pl&countrycode=pl&limit=1&no_annotations=1`
-      );
-      const data = await res.json();
+    // --- pomocnicze ---
+    const IN_PL = ({ lat, lon }) =>
+      lat >= 48.5 && lat <= 55.0 && lon >= 14.0 && lon <= 24.5;
 
-      if (data.results && data.results.length > 0) {
-        const { lat, lng } = data.results[0].geometry;
-        // ⚠️ pilnujemy kolejności — Leaflet chce [lat, lon]
-        return { lat, lon: lng };
-      } else {
-        console.warn("⚠️ Nie znaleziono adresu:", cleanedAddress);
-        return null;
+    const fixIfSwapped = ({ lat, lon }) => {
+      // jeśli wygląda jak zamiana – odwróć
+      if (lat < 30 && lon > 30) return { lat: lon, lon: lat };
+      return { lat, lon };
+    };
+
+    const looksInteger = (n) => Math.abs(n - Math.round(n)) < 1e-9;
+
+    // próbujemy odzyskać kod i miasto z konwencji: "XX-XXX Miejscowość, reszta"
+    const POST_RE = /\b\d{2}-\d{3}\b/;
+    const postMatch = cleanedAddress.match(POST_RE);
+    const kod = postMatch ? postMatch[0] : "";
+
+    // miasto: zakładamy, że jest od razu po kodzie do pierwszego przecinka
+    let miejscowosc = "";
+    if (kod) {
+      const afterPost = cleanedAddress.split(kod)[1]?.trim() || "";
+      miejscowosc = (afterPost.split(",")[0] || "").trim();
+    }
+
+    const fetchOC = async (q) => {
+      const url =
+        `https://api.opencagedata.com/geocode/v1/json?` +
+        `q=${encodeURIComponent(q)}` +
+        `&key=${apiKey}&language=pl&countrycode=pl&no_annotations=1&limit=5`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`OpenCage ${res.status}`);
+      return res.json();
+    };
+
+    const cityField = (c) =>
+      (c.city || c.town || c.village || c.municipality || "").toLowerCase();
+
+    const pickBest = (results) => {
+      if (!results || !results.length) return null;
+
+      // 1) filtr po kodzie pocztowym
+      let arr = results;
+      if (kod) {
+        const k = kod.replace(/\s/g, "").toLowerCase();
+        const withPost = results.filter((r) => {
+          const pc = (r.components.postcode || "")
+            .replace(/\s/g, "")
+            .toLowerCase();
+          return pc === k;
+        });
+        if (withPost.length) arr = withPost;
       }
+
+      // 2) filtr po miejscowości (najpierw exact, potem częściowe)
+      if (miejscowosc) {
+        const m = miejscowosc.toLowerCase();
+        const exact = arr.filter((r) => cityField(r.components) === m);
+        if (exact.length) arr = exact;
+        else {
+          const loose = arr.filter((r) => cityField(r.components).includes(m));
+          if (loose.length) arr = loose;
+        }
+      }
+
+      // 3) preferuj wyniki z drogą/numerem
+      arr.sort((a, b) => {
+        const sa =
+          (a.components.road ? 2 : 0) +
+          (a.components.house_number ? 1 : 0) +
+          (a.components.postcode ? 1 : 0);
+        const sb =
+          (b.components.road ? 2 : 0) +
+          (b.components.house_number ? 1 : 0) +
+          (b.components.postcode ? 1 : 0);
+        return sb - sa;
+      });
+
+      const g = arr[0].geometry;
+      return { lat: g.lat, lon: g.lng };
+    };
+
+    try {
+      // próba 1: pełny adres
+      const data1 = await fetchOC(`${cleanedAddress}, Polska`);
+      let picked = pickBest(data1.results);
+      if (picked) picked = fixIfSwapped(picked);
+
+      // odrzuć wyniki spoza PL lub „podejrzanie całkowite”
+      if (
+        picked &&
+        IN_PL(picked) &&
+        !(looksInteger(picked.lat) && looksInteger(picked.lon))
+      ) {
+        return { lat: Number(picked.lat), lon: Number(picked.lon) };
+      }
+
+      // próba 2: jeśli mamy miasto/kod – spróbuj mniej szczegółowo
+      const base = [miejscowosc, kod].filter(Boolean).join(", ");
+      if (base) {
+        const data2 = await fetchOC(`${base}, Polska`);
+        picked = pickBest(data2.results);
+        if (picked) picked = fixIfSwapped(picked);
+        if (
+          picked &&
+          IN_PL(picked) &&
+          !(looksInteger(picked.lat) && looksInteger(picked.lon))
+        ) {
+          return { lat: Number(picked.lat), lon: Number(picked.lon) };
+        }
+      }
+
+      // próba 3: samo miasto
+      if (miejscowosc) {
+        const data3 = await fetchOC(`${miejscowosc}, Polska`);
+        picked = pickBest(data3.results);
+        if (picked) picked = fixIfSwapped(picked);
+        if (
+          picked &&
+          IN_PL(picked) &&
+          !(looksInteger(picked.lat) && looksInteger(picked.lon))
+        ) {
+          return { lat: Number(picked.lat), lon: Number(picked.lon) };
+        }
+      }
+
+      console.warn(
+        "⚠️ Geokodowanie nieudane lub wynik podejrzany:",
+        cleanedAddress
+      );
+      return null;
     } catch (err) {
-      console.error("❌ Błąd geokodowania:", err);
+      console.error("❌ Błąd geokodowania:", err.message || err);
       return null;
     }
   }
@@ -249,7 +360,7 @@ export default function Mapa() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 8.00</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 8.10</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">

@@ -298,7 +298,6 @@ export default function Mapa() {
       console.log("📦 Reklamacje:", data);
 
       const pointsWithCoords = [];
-
       let zapisane = 0;
       let przetworzone = 0;
       let bledy = 0;
@@ -306,17 +305,24 @@ export default function Mapa() {
       for (const rek of data) {
         const fullAddress = `${rek.kod_pocztowy} ${rek.miejscowosc}, ${rek.adres}`;
 
-        if (rek.lat && rek.lon) {
+        // 1) jeśli ktoś już ma 52/20 — traktuj jak brak współrzędnych (nie dodawaj na mapę)
+        if (rek.lat === 52 && rek.lon === 20) {
+          bledy++;
+          continue;
+        }
+
+        // 2) jeśli rekord ma już poprawne współrzędne — bierz je
+        if (rek.lat != null && rek.lon != null) {
           zapisane++;
           pointsWithCoords.push({ ...rek, adres: fullAddress });
           continue;
         }
 
+        // 3) geokoduj brakujące
         const coords = await geocodeAddress(fullAddress);
 
         if (coords) {
           przetworzone++;
-
           await supabase
             .from("reklamacje")
             .update({ lat: coords.lat, lon: coords.lon })
@@ -330,12 +336,24 @@ export default function Mapa() {
           });
         } else {
           bledy++;
+          // (opcjonalnie) jawnie zapisz NULL, żeby nie wskoczył żaden default
+          await supabase
+            .from("reklamacje")
+            .update({ lat: null, lon: null })
+            .eq("id", rek.id);
         }
       }
 
+      // 4) GLOBALNY cleanup po pętli – posprzątaj wszystko co ma dokładnie 52/20
+      await supabase
+        .from("reklamacje")
+        .update({ lat: null, lon: null })
+        .eq("lat", 52)
+        .eq("lon", 20);
+
       setPoints(spreadMarkers(pointsWithCoords));
       setStatystyki({ zapisane, przetworzone, bledy });
-      setShowPopup(true); // pokaż popup po zakończeniu
+      setShowPopup(true);
     } catch (error) {
       console.error("❌ Błąd Supabase:", error.message);
     } finally {
@@ -360,7 +378,7 @@ export default function Mapa() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 8.10</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 8.20</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">

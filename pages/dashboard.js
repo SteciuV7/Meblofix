@@ -104,7 +104,7 @@ export default function Dashboard() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 8.10</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 8.20</span>
         </h1>
 
         {/* Informacje o użytkowniku */}

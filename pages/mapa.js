@@ -37,7 +37,7 @@ function spreadMarkers(points) {
     }
 
     // kolejne punkty w tym samym miejscu – dostają przesunięcie
-    const offset = 0.0002 * count; // ~20m na każdy dodatkowy punkt
+    const offset = 0.002 * count; // ~200m na każdy dodatkowy punkt
     return {
       ...p,
       lat: p.lat + offset,

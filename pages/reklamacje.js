@@ -12,6 +12,20 @@ import Tippy from "@tippyjs/react";
 import "tippy.js/dist/tippy.css";
 import { Truck } from "lucide-react";
 import { geocodeAddress } from "../lib/geocode";
+import {
+  validatePostalCode,
+  filterPostalOnChange,
+  formatPostalOnBlur,
+  postalError,
+  sanitizeTown,
+  sanitizeTownOnChange, // 🔁 dodaj to
+  validateTown,
+  townError,
+  sanitizeAddress,
+  sanitizeAddressOnChange, // 🔁 dodaj to
+  validateAddress,
+  addressError,
+} from "@/lib/formValidation";
 
 export default function Reklamacje() {
   const [selectedReklamacja, setSelectedReklamacja] = useState(null);
@@ -112,6 +126,13 @@ export default function Reklamacje() {
       alert(`Błąd: ${error.message}`);
     }
   };
+  const [touched, setTouched] = useState({
+    kod_pocztowy: false,
+    miejscowosc: false,
+    adres: false,
+  });
+
+  const markTouched = (field) => setTouched((t) => ({ ...t, [field]: true }));
 
   function CarIcon({ trasa }) {
     return (
@@ -635,7 +656,7 @@ export default function Reklamacje() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 8.20</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 9.0</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">
@@ -1055,6 +1076,7 @@ export default function Reklamacje() {
                       </option>
                     ))}
                 </select>
+
                 <label className="font-semibold">Numer reklamacji</label>
                 <input
                   placeholder="Numer Reklamacji"
@@ -1067,51 +1089,129 @@ export default function Reklamacje() {
                     })
                   }
                 />
+
                 <label className="font-semibold">Kod pocztowy</label>
                 <input
                   placeholder="Kod pocztowy (XX-XXX)"
-                  className={`border p-2 w-full mb-2 ${
-                    /^\d{2}-\d{3}$/.test(newReklamacja.kod_pocztowy)
-                      ? "border-green-500"
-                      : "border-red-500"
-                  }`}
+                  className={[
+                    "border p-2 w-full mb-1 rounded",
+                    touched.kod_pocztowy
+                      ? validatePostalCode(newReklamacja.kod_pocztowy)
+                        ? "border-green-500"
+                        : "border-red-500"
+                      : "border-gray-300",
+                  ].join(" ")}
                   value={newReklamacja.kod_pocztowy}
                   onChange={(e) =>
-                    setNewReklamacja({
-                      ...newReklamacja,
-                      kod_pocztowy: e.target.value,
-                    })
+                    setNewReklamacja((prev) => ({
+                      ...prev,
+                      kod_pocztowy: filterPostalOnChange(e.target.value), // lekkie filtrowanie
+                    }))
                   }
+                  onBlur={(e) => {
+                    setNewReklamacja((prev) => ({
+                      ...prev,
+                      kod_pocztowy: formatPostalOnBlur(e.target.value), // docięcie i wstawienie '-'
+                    }));
+                    markTouched("kod_pocztowy");
+                  }}
+                  aria-invalid={
+                    !!(
+                      touched.kod_pocztowy &&
+                      postalError(newReklamacja.kod_pocztowy)
+                    )
+                  }
+                  aria-describedby="kod-pocztowy-error"
                 />
-                {!/^\d{2}-\d{3}$/.test(newReklamacja.kod_pocztowy) && (
-                  <p className="text-red-500 text-sm">
-                    Kod pocztowy powinien mieć format XX-XXX
-                  </p>
-                )}
+                {touched.kod_pocztowy &&
+                  postalError(newReklamacja.kod_pocztowy) && (
+                    <p
+                      id="kod-pocztowy-error"
+                      className="text-red-500 text-sm mb-2"
+                    >
+                      {postalError(newReklamacja.kod_pocztowy)}
+                    </p>
+                  )}
+
                 <label className="font-semibold">Miejscowość</label>
                 <input
                   placeholder="Miasto"
-                  className="border p-2 w-full mb-2"
+                  className={[
+                    "border p-2 w-full mb-1 rounded",
+                    touched.miejscowosc
+                      ? validateTown(newReklamacja.miejscowosc)
+                        ? "border-green-500"
+                        : "border-red-500"
+                      : "border-gray-300",
+                  ].join(" ")}
                   value={newReklamacja.miejscowosc}
                   onChange={(e) =>
-                    setNewReklamacja({
-                      ...newReklamacja,
-                      miejscowosc: e.target.value,
-                    })
+                    setNewReklamacja((prev) => ({
+                      ...prev,
+                      miejscowosc: sanitizeTownOnChange(e.target.value), // 🔁 CHANGED – zachowuje spację na końcu
+                    }))
                   }
+                  onBlur={(e) => {
+                    setNewReklamacja((prev) => ({
+                      ...prev,
+                      miejscowosc: sanitizeTown(e.target.value), // final cleanup na blur
+                    }));
+                    markTouched("miejscowosc");
+                  }}
+                  aria-invalid={
+                    !!(
+                      touched.miejscowosc &&
+                      townError(newReklamacja.miejscowosc)
+                    )
+                  }
+                  aria-describedby="miejscowosc-error"
                 />
+                {touched.miejscowosc &&
+                  townError(newReklamacja.miejscowosc) && (
+                    <p
+                      id="miejscowosc-error"
+                      className="text-red-500 text-sm mb-2"
+                    >
+                      {townError(newReklamacja.miejscowosc)}
+                    </p>
+                  )}
+
                 <label className="font-semibold">Adres</label>
                 <input
-                  placeholder="Adres"
-                  className="border p-2 w-full mb-2"
+                  placeholder="Nazwa ulicy + numer (np. Jana III Sobieskiego 12A/4)"
+                  className={[
+                    "border p-2 w-full mb-1 rounded",
+                    touched.adres
+                      ? validateAddress(newReklamacja.adres)
+                        ? "border-green-500"
+                        : "border-red-500"
+                      : "border-gray-300",
+                  ].join(" ")}
                   value={newReklamacja.adres}
                   onChange={(e) =>
-                    setNewReklamacja({
-                      ...newReklamacja,
-                      adres: e.target.value,
-                    })
+                    setNewReklamacja((prev) => ({
+                      ...prev,
+                      adres: sanitizeAddressOnChange(e.target.value), // 🔁 CHANGED – zachowuje spację na końcu
+                    }))
                   }
+                  onBlur={(e) => {
+                    setNewReklamacja((prev) => ({
+                      ...prev,
+                      adres: sanitizeAddress(e.target.value), // final cleanup na blur
+                    }));
+                    markTouched("adres");
+                  }}
+                  aria-invalid={
+                    !!(touched.adres && addressError(newReklamacja.adres))
+                  }
+                  aria-describedby="adres-error"
                 />
+                {touched.adres && addressError(newReklamacja.adres) && (
+                  <p id="adres-error" className="text-red-500 text-sm mb-2">
+                    {addressError(newReklamacja.adres)}
+                  </p>
+                )}
+
                 {/* 🔹 Informacje od zgłaszającego */}
                 <label className="font-semibold">
                   Informacje od zgłaszającego
@@ -1127,6 +1227,7 @@ export default function Reklamacje() {
                     })
                   }
                 />
+
                 <label className="font-semibold">Termin realizacji</label>
                 <p></p>
                 <DatePicker
@@ -1222,78 +1323,126 @@ export default function Reklamacje() {
               <button
                 className="bg-green-500 text-white px-4 py-2 rounded mr-2"
                 disabled={
-                  !/^\d{2}-\d{3}$/.test(newReklamacja.kod_pocztowy) ||
-                  newReklamacja.nazwa_firmy === ""
+                  !validatePostalCode(newReklamacja.kod_pocztowy) ||
+                  !validateTown(newReklamacja.miejscowosc) ||
+                  !validateAddress(newReklamacja.adres) ||
+                  newReklamacja.nazwa_firmy === "" ||
+                  !pdfFile
                 }
                 onClick={async () => {
-                  try {
+                  // ✅ OSTATECZNA WALIDACJA FRONTOWA
+                  const postalOk = validatePostalCode(
+                    newReklamacja.kod_pocztowy
+                  );
+                  const townOk = validateTown(newReklamacja.miejscowosc);
+                  const addrOk = validateAddress(newReklamacja.adres);
+                  const firmaOk = !!newReklamacja.nazwa_firmy;
+
+                  if (!postalOk || !townOk || !addrOk || !firmaOk || !pdfFile) {
+                    setTouched({
+                      kod_pocztowy: true,
+                      miejscowosc: true,
+                      adres: true,
+                    });
                     if (!pdfFile) {
                       alert("PDF jest wymagany!");
+                    } else {
+                      alert("Uzupełnij poprawnie dane adresowe i nazwę firmy.");
+                    }
+                    return;
+                  }
+
+                  try {
+                    // ✂️ „Sprzątanie” na wszelki wypadek
+                    const sanitizedTown = sanitizeTown(
+                      newReklamacja.miejscowosc
+                    );
+                    const sanitizedAddr = sanitizeAddress(newReklamacja.adres);
+                    const sanitizedPostal = formatPostalOnBlur(
+                      newReklamacja.kod_pocztowy
+                    );
+
+                    // 🧭 Geokodowanie
+                    const fullAddress = `${sanitizedTown}, ${sanitizedPostal} ${sanitizedAddr}`;
+                    const coords = await geocodeAddress(fullAddress);
+
+                    if (
+                      !coords ||
+                      typeof coords.lat !== "number" ||
+                      typeof coords.lon !== "number"
+                    ) {
+                      setTouched({
+                        kod_pocztowy: true,
+                        miejscowosc: true,
+                        adres: true,
+                      });
+                      alert(
+                        "Nie udało się zgeokodować adresu. Sprawdź miejscowość / kod / adres i spróbuj ponownie."
+                      );
                       return;
                     }
 
+                    // 📎 Upload PDF
                     const pdfPath = await uploadFile(pdfFile, "pdfs");
                     if (!pdfPath) {
                       alert("Błąd podczas przesyłania PDF.");
                       return;
                     }
 
-                    const imagePaths = [];
-                    for (let i = 0; i < imageFiles.length; i++) {
-                      if (imageFiles[i]) {
-                        const imagePath = await uploadFile(
-                          imageFiles[i],
-                          "images"
-                        );
-                        if (imagePath) imagePaths.push(imagePath);
-                      }
-                    }
+                    // 🖼️ Upload zdjęć (opcjonalnie)
+                    const imagePaths = (
+                      await Promise.all(
+                        imageFiles.map(async (file) =>
+                          file ? await uploadFile(file, "images") : null
+                        )
+                      )
+                    ).filter(Boolean);
 
+                    // ⏱️ Daty
                     const remainingTime =
                       calculateRemainingTime(realizacjaDate);
+                    const isoDate =
+                      realizacjaDate?.toISOString?.() ||
+                      new Date().toISOString();
 
+                    // 🟢 INSERT
                     const { data: inserted, error } = await supabase
                       .from("reklamacje")
                       .insert([
                         {
                           ...newReklamacja,
-                          firma_id: user.firma_id, // Przypisujemy firmę
+                          miejscowosc: sanitizedTown,
+                          adres: sanitizedAddr,
+                          kod_pocztowy: sanitizedPostal,
+                          firma_id: user.firma_id,
                           zalacznik_pdf: pdfPath,
                           zalacznik_zdjecia: imagePaths,
-                          data_zakonczenia: realizacjaDate.toISOString(),
-                          realizacja_do: realizacjaDate.toISOString(),
+                          data_zakonczenia: isoDate,
+                          realizacja_do: isoDate,
                           pozostaly_czas: remainingTime,
                           nieprzeczytane_dla_uzytkownika: true,
+                          lat: coords.lat,
+                          lon: coords.lon,
                         },
                       ])
-                      .select(); // potrzebne żeby dostać ID
+                      .select();
 
                     if (error) {
                       alert(error.message);
-                    } else {
-                      // 🔍 pełny adres z pól
-                      const fullAddress = `${newReklamacja.miejscowosc}, ${newReklamacja.kod_pocztowy} ${newReklamacja.adres}`;
-                      const coords = await geocodeAddress(fullAddress);
-
-                      // 🧭 jeśli znaleziono współrzędne – zapisujemy je do tej nowo dodanej reklamacji
-                      if (coords && inserted && inserted.length > 0) {
-                        await supabase
-                          .from("reklamacje")
-                          .update({ lat: coords.lat, lon: coords.lon })
-                          .eq("id", inserted[0].id);
-                      }
-
-                      alert("✅ Dodano reklamację!");
-                      setShowAddModal(false);
-                      location.reload();
+                      return;
                     }
-                  } catch (error) {
-                    alert(`Błąd: ${error.message}`);
+
+                    alert("✅ Dodano reklamację!");
+                    setShowAddModal(false);
+                    location.reload();
+                  } catch (err) {
+                    alert(`Błąd: ${err?.message || err}`);
                   }
                 }}
               >
                 Zapisz
               </button>
+
               <button
                 className="bg-red-500 text-white px-4 py-2 rounded"
                 onClick={() => setShowAddModal(false)}
@@ -1304,6 +1453,7 @@ export default function Reklamacje() {
           </div>
         </div>
       )}
+
       {isPreviewOpen && selectedReklamacja && (
         <div
           className="fixed inset-0 flex justify-center items-center z-50 modal-preview overflow-y-auto"
@@ -1551,7 +1701,15 @@ export default function Reklamacje() {
                   onChange={(e) =>
                     setSelectedReklamacja({
                       ...selectedReklamacja,
-                      kod_pocztowy: e.target.value,
+                      // 🔁 podczas pisania: delikatne filtrowanie (nie rusza spacji końcowej)
+                      kod_pocztowy: filterPostalOnChange(e.target.value),
+                    })
+                  }
+                  onBlur={(e) =>
+                    setSelectedReklamacja({
+                      ...selectedReklamacja,
+                      // 🔁 po blur: 12-345 jeśli 5 cyfr
+                      kod_pocztowy: formatPostalOnBlur(e.target.value),
                     })
                   }
                 />
@@ -1564,7 +1722,15 @@ export default function Reklamacje() {
                   onChange={(e) =>
                     setSelectedReklamacja({
                       ...selectedReklamacja,
-                      miejscowosc: e.target.value,
+                      // 🔁 typing-friendly – zostawia jedną końcową spację
+                      miejscowosc: sanitizeTownOnChange(e.target.value),
+                    })
+                  }
+                  onBlur={(e) =>
+                    setSelectedReklamacja({
+                      ...selectedReklamacja,
+                      // 🔁 final cleanup
+                      miejscowosc: sanitizeTown(e.target.value),
                     })
                   }
                 />
@@ -1577,10 +1743,19 @@ export default function Reklamacje() {
                   onChange={(e) =>
                     setSelectedReklamacja({
                       ...selectedReklamacja,
-                      adres: e.target.value,
+                      // 🔁 typing-friendly – zostawia jedną końcową spację
+                      adres: sanitizeAddressOnChange(e.target.value),
+                    })
+                  }
+                  onBlur={(e) =>
+                    setSelectedReklamacja({
+                      ...selectedReklamacja,
+                      // 🔁 final cleanup
+                      adres: sanitizeAddress(e.target.value),
                     })
                   }
                 />
+
                 <label className="font-semibold">Termin realizacji</label>
                 <p></p>
                 <DatePicker
@@ -1596,6 +1771,7 @@ export default function Reklamacje() {
                   className="border p-2 w-full mb-2 rounded"
                 />
                 <p></p>
+
                 {user?.role === "admin" && (
                   <label className="font-semibold">
                     Informacje od Meblofix
@@ -1634,7 +1810,7 @@ export default function Reklamacje() {
                   Załącznik PDF (wymagany)
                 </label>
                 <FileUploader
-                  onFileSelect={(file) => {
+                  onFileSelect={(file, previewUrl) => {
                     setPdfFile(file);
                     setPdfPreview(previewUrl);
                   }}
@@ -1659,10 +1835,8 @@ export default function Reklamacje() {
                       onFileSelect={(file, previewUrl) => {
                         const updatedFiles = [...imageFiles];
                         const updatedPreviews = [...imagePreviews];
-
                         updatedFiles[index] = file;
                         updatedPreviews[index] = previewUrl;
-
                         setImageFiles(updatedFiles);
                         setImagePreviews(updatedPreviews);
                       }}
@@ -1673,10 +1847,8 @@ export default function Reklamacje() {
                       onRemove={() => {
                         const updatedFiles = [...imageFiles];
                         const updatedPreviews = [...imagePreviews];
-
                         updatedFiles[index] = null;
                         updatedPreviews[index] = null;
-
                         setImageFiles(updatedFiles);
                         setImagePreviews(updatedPreviews);
                       }}
@@ -1723,6 +1895,7 @@ export default function Reklamacje() {
                     setClosePdfPreview(null);
                   }}
                 />
+
                 {selectedReklamacja.zalacznik_pdf_zakonczenie && (
                   <div className="mt-2">
                     <p className="text-sm text-gray-700">Aktualny PDF:</p>
@@ -1736,6 +1909,7 @@ export default function Reklamacje() {
                     </a>
                   </div>
                 )}
+
                 <label className="font-semibold mt-4 block">
                   Zdjęcia zakończeniowe (maks. 4)
                 </label>
@@ -1746,10 +1920,8 @@ export default function Reklamacje() {
                       onFileSelect={(file, previewUrl) => {
                         const updatedFiles = [...closeImageFiles];
                         const updatedPreviews = [...closeImagePreviews];
-
                         updatedFiles[index] = file;
                         updatedPreviews[index] = previewUrl;
-
                         setCloseImageFiles(updatedFiles);
                         setCloseImagePreviews(updatedPreviews);
                       }}
@@ -1760,15 +1932,14 @@ export default function Reklamacje() {
                       onRemove={() => {
                         const updatedFiles = [...closeImageFiles];
                         const updatedPreviews = [...closeImagePreviews];
-
                         updatedFiles[index] = null;
                         updatedPreviews[index] = null;
-
                         setCloseImageFiles(updatedFiles);
                         setCloseImagePreviews(updatedPreviews);
                       }}
                     />
                   ))}
+
                   {selectedReklamacja.zalacznik_zakonczenie?.length > 0 && (
                     <div className="mt-4">
                       <p className="text-sm text-gray-700 mb-1">
@@ -1804,10 +1975,22 @@ export default function Reklamacje() {
                   Usuń reklamację
                 </button>
               )}
+
               <button
                 className="bg-green-500 text-white px-4 py-2 rounded mr-2"
                 onClick={async () => {
                   try {
+                    // ✂️ sprzątanie tuż przed zapisem (spójne porównania + geokodowanie)
+                    const sanitizedTown = sanitizeTown(
+                      selectedReklamacja.miejscowosc || ""
+                    );
+                    const sanitizedAddr = sanitizeAddress(
+                      selectedReklamacja.adres || ""
+                    );
+                    const sanitizedPostal = formatPostalOnBlur(
+                      selectedReklamacja.kod_pocztowy || ""
+                    );
+
                     let pdfPath = selectedReklamacja?.zalacznik_pdf;
                     if (pdfFile) {
                       pdfPath = await uploadFile(pdfFile, "pdfs");
@@ -1826,7 +2009,7 @@ export default function Reklamacje() {
                       }
                     }
 
-                    // ➕ Nowość: upload danych zakończeniowych (dla admina)
+                    // ➕ zakończeniowe (admin)
                     let pdfZakonczeniePath =
                       selectedReklamacja?.zalacznik_pdf_zakonczenie || null;
                     if (user?.role === "admin" && closePdfFile) {
@@ -1835,12 +2018,10 @@ export default function Reklamacje() {
                         "pdfs"
                       );
                     }
-
                     let zalacznikZakonczenie =
                       selectedReklamacja.zalacznik_zakonczenie
                         ? [...selectedReklamacja.zalacznik_zakonczenie]
                         : [];
-
                     if (user?.role === "admin") {
                       for (let i = 0; i < closeImageFiles.length; i++) {
                         if (closeImageFiles[i]) {
@@ -1856,22 +2037,7 @@ export default function Reklamacje() {
                     const remainingTime =
                       calculateRemainingTime(realizacjaDate);
 
-                    const { nr_reklamacji, ...reklamacjaData } =
-                      selectedReklamacja;
-
-                    const aktualizowaneDane = {
-                      ...reklamacjaData,
-                      zalacznik_pdf: pdfPath,
-                      zalacznik_zdjecia: imagePaths,
-                      realizacja_do: realizacjaDate.toISOString(),
-                      pozostaly_czas: remainingTime,
-                      status: "Zaktualizowano",
-                      ...(user?.role === "admin" && {
-                        nieprzeczytane_dla_uzytkownika: true,
-                      }),
-                    };
-
-                    // 🧠 Sprawdź, czy zmienił się adres → jeśli tak, wyzeruj współrzędne
+                    // pobierz stare dane do porównania
                     const { data: staraReklamacja, error: fetchError } =
                       await supabase
                         .from("reklamacje")
@@ -1884,28 +2050,41 @@ export default function Reklamacje() {
                       return;
                     }
 
+                    // porównuj po sanityzacji (spójnie z tym, co zapiszesz)
+                    const staryAddrSan = {
+                      adres: sanitizeAddress(staraReklamacja.adres || ""),
+                      miejscowosc: sanitizeTown(
+                        staraReklamacja.miejscowosc || ""
+                      ),
+                      kod_pocztowy: formatPostalOnBlur(
+                        staraReklamacja.kod_pocztowy || ""
+                      ),
+                    };
+
                     const adresZmieniony =
-                      staraReklamacja.adres !== selectedReklamacja.adres ||
-                      staraReklamacja.miejscowosc !==
-                        selectedReklamacja.miejscowosc ||
-                      staraReklamacja.kod_pocztowy !==
-                        selectedReklamacja.kod_pocztowy;
+                      staryAddrSan.adres !== sanitizedAddr ||
+                      staryAddrSan.miejscowosc !== sanitizedTown ||
+                      staryAddrSan.kod_pocztowy !== sanitizedPostal;
 
-                    if (adresZmieniony) {
-                      aktualizowaneDane.lat = null;
-                      aktualizowaneDane.lon = null;
-                    }
-
-                    // ➕ tylko jeśli admin, dodaj dane z zakończenia
-                    if (user?.role === "admin") {
-                      aktualizowaneDane.opis_przebiegu =
-                        selectedReklamacja.opis_przebiegu || "";
-                      aktualizowaneDane.zalacznik_pdf_zakonczenie =
-                        pdfZakonczeniePath;
-                      aktualizowaneDane.zalacznik_zakonczenie =
-                        zalacznikZakonczenie;
-                      aktualizowaneDane.nieprzeczytane_dla_uzytkownika = true;
-                    }
+                    const aktualizowaneDane = {
+                      ...selectedReklamacja,
+                      // nadpisujemy polami „posprzątanymi”
+                      miejscowosc: sanitizedTown,
+                      adres: sanitizedAddr,
+                      kod_pocztowy: sanitizedPostal,
+                      zalacznik_pdf: pdfPath,
+                      zalacznik_zdjecia: imagePaths,
+                      realizacja_do: realizacjaDate.toISOString(),
+                      pozostaly_czas: remainingTime,
+                      status: "Zaktualizowano",
+                      ...(adresZmieniony ? { lat: null, lon: null } : {}),
+                      ...(user?.role === "admin" && {
+                        opis_przebiegu: selectedReklamacja.opis_przebiegu || "",
+                        zalacznik_pdf_zakonczenie: pdfZakonczeniePath,
+                        zalacznik_zakonczenie: zalacznikZakonczenie,
+                        nieprzeczytane_dla_uzytkownika: true,
+                      }),
+                    };
 
                     const { error } = await supabase
                       .from("reklamacje")
@@ -1914,22 +2093,24 @@ export default function Reklamacje() {
 
                     if (error) {
                       alert(error.message);
-                    } else {
-                      if (!aktualizowaneDane.lat && !aktualizowaneDane.lon) {
-                        const fullAddress = `${selectedReklamacja.miejscowosc}, ${selectedReklamacja.kod_pocztowy} ${selectedReklamacja.adres}`;
-                        const coords = await geocodeAddress(fullAddress);
-
-                        if (coords) {
-                          await supabase
-                            .from("reklamacje")
-                            .update({ lat: coords.lat, lon: coords.lon })
-                            .eq("id", selectedReklamacja.id);
-                        }
-                      }
-                      alert("✅ Zaktualizowano reklamację!");
-                      setIsEditOpen(false);
-                      location.reload();
+                      return;
                     }
+
+                    // jeśli wyzerowaliśmy współrzędne – spróbuj geokodować na świeżo
+                    if (adresZmieniony) {
+                      const fullAddress = `${sanitizedTown}, ${sanitizedPostal} ${sanitizedAddr}`;
+                      const coords = await geocodeAddress(fullAddress);
+                      if (coords) {
+                        await supabase
+                          .from("reklamacje")
+                          .update({ lat: coords.lat, lon: coords.lon })
+                          .eq("id", selectedReklamacja.id);
+                      }
+                    }
+
+                    alert("✅ Zaktualizowano reklamację!");
+                    setIsEditOpen(false);
+                    location.reload();
                   } catch (error) {
                     alert(`Błąd: ${error.message}`);
                   }
@@ -1948,6 +2129,7 @@ export default function Reklamacje() {
           </div>
         </div>
       )}
+
       {isCloseOpen && selectedReklamacja && (
         <div
           className="fixed inset-0 flex justify-center items-center z-50"

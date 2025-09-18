@@ -761,16 +761,16 @@ export default function Reklamacje() {
             r.status === "Zgłoszone"
               ? "bg-yellow-200/80"
               : r.status === "Zakończone"
-              ? "bg-green-200/80"
-              : r.status === "W trakcie realizacji"
-              ? "bg-blue-200/80"
-              : r.status === "Oczekuje na informacje"
-              ? "bg-red-200/80"
-              : r.status === "Oczekuje na dostawę"
-              ? "bg-purple-200/80"
-              : r.status === "Zaktualizowano"
-              ? "bg-orange-200/80"
-              : "bg-gray-200/80"
+                ? "bg-green-200/80"
+                : r.status === "W trakcie realizacji"
+                  ? "bg-blue-200/80"
+                  : r.status === "Oczekuje na informacje"
+                    ? "bg-red-200/80"
+                    : r.status === "Oczekuje na dostawę"
+                      ? "bg-purple-200/80"
+                      : r.status === "Zaktualizowano"
+                        ? "bg-orange-200/80"
+                        : "bg-gray-200/80"
           }`
         : ""
     }`}
@@ -885,8 +885,8 @@ export default function Reklamacje() {
                         calculateRemainingTime(r.realizacja_do) <= 5
                           ? "bg-red-500"
                           : calculateRemainingTime(r.realizacja_do) <= 10
-                          ? "bg-yellow-500"
-                          : "bg-green-500"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
                       }`}
                     >
                       {calculateRemainingTime(r.realizacja_do) <= 5 ? (
@@ -911,16 +911,16 @@ export default function Reklamacje() {
                           r.status === "Zgłoszone"
                             ? "bg-yellow-500"
                             : r.status === "Zakończone"
-                            ? "bg-green-500"
-                            : r.status === "W trakcie realizacji"
-                            ? "bg-blue-500"
-                            : r.status === "Oczekuje na dostawę"
-                            ? "bg-purple-500"
-                            : r.status === "Oczekuje na informacje"
-                            ? "bg-red-500"
-                            : r.status === "Zaktualizowano"
-                            ? "bg-orange-500"
-                            : "bg-gray-500"
+                              ? "bg-green-500"
+                              : r.status === "W trakcie realizacji"
+                                ? "bg-blue-500"
+                                : r.status === "Oczekuje na dostawę"
+                                  ? "bg-purple-500"
+                                  : r.status === "Oczekuje na informacje"
+                                    ? "bg-red-500"
+                                    : r.status === "Zaktualizowano"
+                                      ? "bg-orange-500"
+                                      : "bg-gray-500"
                         }`}
                       >
                         {r.status}
@@ -1105,7 +1105,7 @@ export default function Reklamacje() {
                   onChange={(e) =>
                     setNewReklamacja((prev) => ({
                       ...prev,
-                      kod_pocztowy: filterPostalOnChange(e.target.value), // lekkie filtrowanie
+                      kod_pocztowy: e.target.value, // lekkie filtrowanie
                     }))
                   }
                   onBlur={(e) => {
@@ -1148,7 +1148,7 @@ export default function Reklamacje() {
                   onChange={(e) =>
                     setNewReklamacja((prev) => ({
                       ...prev,
-                      miejscowosc: sanitizeTownOnChange(e.target.value), // 🔁 CHANGED – zachowuje spację na końcu
+                      miejscowosc: e.target.value, // 🔁 CHANGED – zachowuje spację na końcu
                     }))
                   }
                   onBlur={(e) => {
@@ -1191,7 +1191,7 @@ export default function Reklamacje() {
                   onChange={(e) =>
                     setNewReklamacja((prev) => ({
                       ...prev,
-                      adres: sanitizeAddressOnChange(e.target.value), // 🔁 CHANGED – zachowuje spację na końcu
+                      adres: e.target.value, // 🔁 CHANGED – zachowuje spację na końcu
                     }))
                   }
                   onBlur={(e) => {
@@ -1344,27 +1344,33 @@ export default function Reklamacje() {
                       miejscowosc: true,
                       adres: true,
                     });
-                    if (!pdfFile) {
-                      alert("PDF jest wymagany!");
-                    } else {
-                      alert("Uzupełnij poprawnie dane adresowe i nazwę firmy.");
-                    }
+                    alert(
+                      !pdfFile
+                        ? "PDF jest wymagany!"
+                        : "Uzupełnij poprawnie dane adresowe i nazwę firmy."
+                    );
                     return;
                   }
 
                   try {
-                    // ✂️ „Sprzątanie” na wszelki wypadek
+                    // ✂️ Sanitizacja
                     const sanitizedTown = sanitizeTown(
                       newReklamacja.miejscowosc
-                    );
-                    const sanitizedAddr = sanitizeAddress(newReklamacja.adres);
+                    ).trim();
+                    const sanitizedAddr = sanitizeAddress(
+                      newReklamacja.adres
+                    ).trim();
                     const sanitizedPostal = formatPostalOnBlur(
                       newReklamacja.kod_pocztowy
-                    );
+                    ).trim();
 
-                    // 🧭 Geokodowanie
-                    const fullAddress = `${sanitizedTown}, ${sanitizedPostal} ${sanitizedAddr}`;
-                    const coords = await geocodeAddress(fullAddress);
+                    // 🧭 Geokodowanie z pełnym scoringiem (ulica + numer + miasto + kod)
+                    const fullAddress = `${sanitizedTown}, ${sanitizedPostal} ${sanitizedAddr}`; // Np. "Gliwice, 44-100 Dolna 7/4"
+                    const coords = await geocodeAddress(fullAddress, {
+                      miejscowosc: sanitizedTown,
+                      kod: sanitizedPostal,
+                      ulica: sanitizedAddr,
+                    });
 
                     if (
                       !coords ||
@@ -1377,12 +1383,12 @@ export default function Reklamacje() {
                         adres: true,
                       });
                       alert(
-                        "Nie udało się zgeokodować adresu. Sprawdź miejscowość / kod / adres i spróbuj ponownie."
+                        "Nie udało się zgeokodować adresu. Sprawdź miejscowość/kod/adres i spróbuj ponownie."
                       );
                       return;
                     }
 
-                    // 📎 Upload PDF
+                    // 📎 Upload PDF (wymagany)
                     const pdfPath = await uploadFile(pdfFile, "pdfs");
                     if (!pdfPath) {
                       alert("Błąd podczas przesyłania PDF.");
@@ -1405,7 +1411,7 @@ export default function Reklamacje() {
                       realizacjaDate?.toISOString?.() ||
                       new Date().toISOString();
 
-                    // 🟢 INSERT
+                    // 🟢 INSERT do Supabase
                     const { data: inserted, error } = await supabase
                       .from("reklamacje")
                       .insert([
@@ -1702,7 +1708,7 @@ export default function Reklamacje() {
                     setSelectedReklamacja({
                       ...selectedReklamacja,
                       // 🔁 podczas pisania: delikatne filtrowanie (nie rusza spacji końcowej)
-                      kod_pocztowy: filterPostalOnChange(e.target.value),
+                      kod_pocztowy: e.target.value,
                     })
                   }
                   onBlur={(e) =>
@@ -1723,7 +1729,7 @@ export default function Reklamacje() {
                     setSelectedReklamacja({
                       ...selectedReklamacja,
                       // 🔁 typing-friendly – zostawia jedną końcową spację
-                      miejscowosc: sanitizeTownOnChange(e.target.value),
+                      miejscowosc: e.target.value,
                     })
                   }
                   onBlur={(e) =>
@@ -1744,7 +1750,7 @@ export default function Reklamacje() {
                     setSelectedReklamacja({
                       ...selectedReklamacja,
                       // 🔁 typing-friendly – zostawia jedną końcową spację
-                      adres: sanitizeAddressOnChange(e.target.value),
+                      adres: e.target.value,
                     })
                   }
                   onBlur={(e) =>
@@ -1983,19 +1989,21 @@ export default function Reklamacje() {
                     // ✂️ sprzątanie tuż przed zapisem (spójne porównania + geokodowanie)
                     const sanitizedTown = sanitizeTown(
                       selectedReklamacja.miejscowosc || ""
-                    );
+                    ).trim();
                     const sanitizedAddr = sanitizeAddress(
                       selectedReklamacja.adres || ""
-                    );
+                    ).trim();
                     const sanitizedPostal = formatPostalOnBlur(
                       selectedReklamacja.kod_pocztowy || ""
-                    );
+                    ).trim();
 
-                    let pdfPath = selectedReklamacja?.zalacznik_pdf;
+                    // 📎 PDF (główny)
+                    let pdfPath = selectedReklamacja?.zalacznik_pdf || null;
                     if (pdfFile) {
                       pdfPath = await uploadFile(pdfFile, "pdfs");
                     }
 
+                    // 🖼️ Zdjęcia zgłoszeniowe
                     const imagePaths = selectedReklamacja.zalacznik_zdjecia
                       ? [...selectedReklamacja.zalacznik_zdjecia]
                       : [];
@@ -2009,7 +2017,7 @@ export default function Reklamacje() {
                       }
                     }
 
-                    // ➕ zakończeniowe (admin)
+                    // ➕ Załączniki zakończeniowe (admin)
                     let pdfZakonczeniePath =
                       selectedReklamacja?.zalacznik_pdf_zakonczenie || null;
                     if (user?.role === "admin" && closePdfFile) {
@@ -2034,8 +2042,12 @@ export default function Reklamacje() {
                       }
                     }
 
+                    // ⏱️ Daty
                     const remainingTime =
                       calculateRemainingTime(realizacjaDate);
+                    const isoDate =
+                      realizacjaDate?.toISOString?.() ||
+                      new Date().toISOString();
 
                     // pobierz stare dane do porównania
                     const { data: staraReklamacja, error: fetchError } =
@@ -2074,7 +2086,7 @@ export default function Reklamacje() {
                       kod_pocztowy: sanitizedPostal,
                       zalacznik_pdf: pdfPath,
                       zalacznik_zdjecia: imagePaths,
-                      realizacja_do: realizacjaDate.toISOString(),
+                      realizacja_do: isoDate,
                       pozostaly_czas: remainingTime,
                       status: "Zaktualizowano",
                       ...(adresZmieniony ? { lat: null, lon: null } : {}),
@@ -2086,6 +2098,7 @@ export default function Reklamacje() {
                       }),
                     };
 
+                    // zapis zmian
                     const { error } = await supabase
                       .from("reklamacje")
                       .update(aktualizowaneDane)
@@ -2096,11 +2109,20 @@ export default function Reklamacje() {
                       return;
                     }
 
-                    // jeśli wyzerowaliśmy współrzędne – spróbuj geokodować na świeżo
+                    // jeśli wyzerowaliśmy współrzędne – spróbuj geokodować na świeżo (z ulicą/miastem/kodem)
                     if (adresZmieniony) {
                       const fullAddress = `${sanitizedTown}, ${sanitizedPostal} ${sanitizedAddr}`;
-                      const coords = await geocodeAddress(fullAddress);
-                      if (coords) {
+                      const coords = await geocodeAddress(fullAddress, {
+                        miejscowosc: sanitizedTown,
+                        kod: sanitizedPostal,
+                        ulica: sanitizedAddr,
+                      });
+
+                      if (
+                        coords &&
+                        typeof coords.lat === "number" &&
+                        typeof coords.lon === "number"
+                      ) {
                         await supabase
                           .from("reklamacje")
                           .update({ lat: coords.lat, lon: coords.lon })

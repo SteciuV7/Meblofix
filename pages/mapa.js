@@ -50,6 +50,9 @@ function spreadMarkers(points) {
 export default function Mapa() {
   const [user, setUser] = useState(null);
   const [points, setPoints] = useState([]);
+  const [allPoints, setAllPoints] = useState([]); // Wszystkie punkty
+  const [producenci, setProducenci] = useState([]);
+  const [selectedProducent, setSelectedProducent] = useState("");
   const isPointInRoute = (point) => routePoints.some((p) => p.id === point.id);
   const [showRoutePanel, setShowRoutePanel] = useState(false);
   const [defaultIcon, setDefaultIcon] = useState(null);
@@ -118,93 +121,113 @@ export default function Mapa() {
   // w mapa.js – PODMIANKA funkcji 1:1 (zostaje ta sama sygnatura)
 
   const fetchData = useCallback(async () => {
-  try {
-    const { data, error } = await supabase
-      .from("reklamacje")
-      .select(
-        "id, nazwa_firmy, numer_faktury, kod_pocztowy, miejscowosc, adres, opis, pozostaly_czas, realizacja_do, informacje, informacje_od_zglaszajacego, zalacznik_pdf, zalacznik_zdjecia, zalacznik_pdf_zakonczenie, zalacznik_zakonczenie, opis_przebiegu, nieprzeczytane_dla_uzytkownika, status, trasa, lat, lon"
-      )
-      .not("status", "in", '("Zakończone","Archiwum")');
+    try {
+      const { data, error } = await supabase
+        .from("reklamacje")
+        .select(
+          "id, nazwa_firmy, numer_faktury, kod_pocztowy, miejscowosc, adres, opis, pozostaly_czas, realizacja_do, informacje, informacje_od_zglaszajacego, zalacznik_pdf, zalacznik_zdjecia, zalacznik_pdf_zakonczenie, zalacznik_zakonczenie, opis_przebiegu, nieprzeczytane_dla_uzytkownika, status, trasa, lat, lon"
+        )
+        .not("status", "in", '("Zakończone","Archiwum")');
 
-    if (error) throw error;
-    console.log("📦 Reklamacje:", data);
+      if (error) throw error;
+      console.log("📦 Reklamacje:", data);
 
-    const pointsWithCoords = [];
-    let zapisane = 0;
-    let przetworzone = 0;
-    let bledy = 0;
+      const pointsWithCoords = [];
+      let zapisane = 0;
+      let przetworzone = 0;
+      let bledy = 0;
 
-    // ⚠️ kolejno, żeby nie wyjechać poza limity API
-    for (const rek of data) {
-      // standardowa kolejność: "Miasto, Kod Ulica nr"
-      const fullAddress = `${rek.miejscowosc}, ${rek.kod_pocztowy} ${rek.adres}`;
+      // ⚠️ kolejno, żeby nie wyjechać poza limity API
+      for (const rek of data) {
+        // standardowa kolejność: "Miasto, Kod Ulica nr"
+        const fullAddress = `${rek.miejscowosc}, ${rek.kod_pocztowy} ${rek.adres}`;
 
-      // 1) sentinel 52/20 traktuj jako błąd – nie dodawaj na mapę
-      if (rek.lat === 52 && rek.lon === 20) {
-        bledy++;
-        continue;
-      }
+        // 1) sentinel 52/20 traktuj jako błąd – nie dodawaj na mapę
+        if (rek.lat === 52 && rek.lon === 20) {
+          bledy++;
+          continue;
+        }
 
-      // 2) jeżeli ma już współrzędne – użyj i leć dalej
-      if (rek.lat != null && rek.lon != null) {
-        zapisane++;
-        pointsWithCoords.push({ ...rek, adres: fullAddress });
-        continue;
-      }
+        // 2) jeżeli ma już współrzędne – użyj i leć dalej
+        if (rek.lat != null && rek.lon != null) {
+          zapisane++;
+          pointsWithCoords.push({ ...rek, adres: fullAddress });
+          continue;
+        }
 
-      // 3) geokoduj brakujące – PRZEKAZUJEMY MIASTO/KOD/ULICĘ
-      const coords = await geocodeAddress(fullAddress, {
-        miejscowosc: rek.miejscowosc || "",
-        kod: rek.kod_pocztowy || "",
-        ulica: rek.adres || "",
-      });
-
-      if (coords) {
-        przetworzone++;
-        await supabase
-          .from("reklamacje")
-          .update({ lat: coords.lat, lon: coords.lon })
-          .eq("id", rek.id);
-
-        pointsWithCoords.push({
-          ...rek,
-          lat: coords.lat,
-          lon: coords.lon,
-          adres: fullAddress,
+        // 3) geokoduj brakujące – PRZEKAZUJEMY MIASTO/KOD/ULICĘ
+        const coords = await geocodeAddress(fullAddress, {
+          miejscowosc: rek.miejscowosc || "",
+          kod: rek.kod_pocztowy || "",
+          ulica: rek.adres || "",
         });
-      } else {
-        bledy++;
-        // jawnie wyczyść, żeby nie został żaden placeholder
-        await supabase
-          .from("reklamacje")
-          .update({ lat: null, lon: null })
-          .eq("id", rek.id);
+
+        if (coords) {
+          przetworzone++;
+          await supabase
+            .from("reklamacje")
+            .update({ lat: coords.lat, lon: coords.lon })
+            .eq("id", rek.id);
+
+          pointsWithCoords.push({
+            ...rek,
+            lat: coords.lat,
+            lon: coords.lon,
+            adres: fullAddress,
+          });
+        } else {
+          bledy++;
+          // jawnie wyczyść, żeby nie został żaden placeholder
+          await supabase
+            .from("reklamacje")
+            .update({ lat: null, lon: null })
+            .eq("id", rek.id);
+        }
+
+        // (opcjonalnie) jeżeli masz darmowy klucz OC (1 req/s), odkomentuj:
+        // await new Promise(r => setTimeout(r, 1100));
       }
 
-      // (opcjonalnie) jeżeli masz darmowy klucz OC (1 req/s), odkomentuj:
-      // await new Promise(r => setTimeout(r, 1100));
+      // 4) globalny cleanup 52/20
+      await supabase
+        .from("reklamacje")
+        .update({ lat: null, lon: null })
+        .eq("lat", 52)
+        .eq("lon", 20);
+
+      const uniqueProducenci = [
+        ...new Set(data.map((item) => item.nazwa_firmy)),
+      ].sort();
+      setProducenci(uniqueProducenci);
+
+      setAllPoints(pointsWithCoords);
+      setPoints(spreadMarkers(pointsWithCoords));
+      setStatystyki({ zapisane, przetworzone, bledy });
+      setShowPopup(true);
+    } catch (error) {
+      console.error("❌ Błąd Supabase:", error.message);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    // 4) globalny cleanup 52/20
-    await supabase
-      .from("reklamacje")
-      .update({ lat: null, lon: null })
-      .eq("lat", 52)
-      .eq("lon", 20);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-    setPoints(spreadMarkers(pointsWithCoords));
-    setStatystyki({ zapisane, przetworzone, bledy });
-    setShowPopup(true);
-  } catch (error) {
-    console.error("❌ Błąd Supabase:", error.message);
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  const handleFilter = () => {
+    if (selectedProducent) {
+      const filtered = allPoints.filter(
+        (p) => p.nazwa_firmy === selectedProducent
+      );
+      setPoints(spreadMarkers(filtered));
+    }
+  };
 
-useEffect(() => {
-  fetchData();
-}, [fetchData]);
+  const clearFilter = () => {
+    setSelectedProducent("");
+    setPoints(spreadMarkers(allPoints));
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
@@ -275,6 +298,33 @@ useEffect(() => {
           >
             {routeMode ? "Zakończ tryb trasy" : "Tryb trasy"}
           </button>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedProducent}
+              onChange={(e) => setSelectedProducent(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="">Wszyscy producenci</option>
+              {producenci.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleFilter}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Filtruj
+            </button>
+            <button
+              onClick={clearFilter}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            >
+              Wyczyść
+            </button>
+          </div>
 
           {routeMode && (
             <button

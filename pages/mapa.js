@@ -49,6 +49,8 @@ function spreadMarkers(points) {
 
 export default function Mapa() {
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(""); // Dodaj role
+  const [userFirmaId, setUserFirmaId] = useState(null); // Dodaj firma_id
   const [points, setPoints] = useState([]);
   const [allPoints, setAllPoints] = useState([]); // Wszystkie punkty
   const [producenci, setProducenci] = useState([]);
@@ -98,9 +100,26 @@ export default function Mapa() {
   };
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUser(user);
-    });
+    // Pobierz użytkownika i jego dane z firmy
+    async function fetchUser() {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userData, error: userError } = await supabase
+          .from("firmy")
+          .select("*")
+          .eq("email", user.email)
+          .single();
+        if (!userError && userData) {
+          setUser(user);
+          setUserRole(userData.rola);
+          setUserFirmaId(userData.firma_id);
+        }
+      }
+    }
+    fetchUser();
   }, []);
 
   useEffect(() => {
@@ -122,12 +141,28 @@ export default function Mapa() {
 
   const fetchData = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("reklamacje")
-        .select(
-          "id, nazwa_firmy, numer_faktury, kod_pocztowy, miejscowosc, adres, opis, pozostaly_czas, realizacja_do, informacje, informacje_od_zglaszajacego, zalacznik_pdf, zalacznik_zdjecia, zalacznik_pdf_zakonczenie, zalacznik_zakonczenie, opis_przebiegu, nieprzeczytane_dla_uzytkownika, status, trasa, lat, lon"
-        )
-        .not("status", "in", '("Zakończone","Archiwum")');
+      let data, error;
+      if (userRole === "admin") {
+        // Admin widzi wszystkie reklamacje
+        ({ data, error } = await supabase
+          .from("reklamacje")
+          .select(
+            "id, nazwa_firmy, numer_faktury, kod_pocztowy, miejscowosc, adres, opis, pozostaly_czas, realizacja_do, informacje, informacje_od_zglaszajacego, zalacznik_pdf, zalacznik_zdjecia, zalacznik_pdf_zakonczenie, zalacznik_zakonczenie, opis_przebiegu, nieprzeczytane_dla_uzytkownika, status, trasa, lat, lon"
+          )
+          .not("status", "in", '("Zakończone","Archiwum")'));
+      } else if (userFirmaId) {
+        // Użytkownik widzi tylko swoje reklamacje
+        ({ data, error } = await supabase
+          .from("reklamacje")
+          .select(
+            "id, nazwa_firmy, numer_faktury, kod_pocztowy, miejscowosc, adres, opis, pozostaly_czas, realizacja_do, informacje, informacje_od_zglaszajacego, zalacznik_pdf, zalacznik_zdjecia, zalacznik_pdf_zakonczenie, zalacznik_zakonczenie, opis_przebiegu, nieprzeczytane_dla_uzytkownika, status, trasa, lat, lon"
+          )
+          .eq("firma_id", userFirmaId)
+          .not("status", "in", '("Zakończone","Archiwum")'));
+      } else {
+        setLoading(false);
+        return;
+      }
 
       if (error) throw error;
       console.log("📦 Reklamacje:", data);
@@ -209,11 +244,11 @@ export default function Mapa() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userRole, userFirmaId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (userRole) fetchData();
+  }, [fetchData, userRole]);
 
   const handleFilter = () => {
     if (selectedProducent) {
@@ -237,7 +272,7 @@ export default function Mapa() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 9.0</span>
+          <span className="text-sm text-gray-400 font-normal">Ver. 9.1</span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">
@@ -283,58 +318,59 @@ export default function Mapa() {
 
       <div className="p-6">
         <h2 className="text-3xl font-bold mb-6 text-center">Mapa reklamacji</h2>
-        <div className="flex justify-between items-center mb-4">
-          <button
-            className={`px-4 py-2 rounded text-white ${
-              routeMode ? "bg-yellow-600" : "bg-gray-800"
-            } hover:bg-yellow-700`}
-            onClick={() => {
-              setRouteMode(!routeMode);
-              if (routeMode) {
-                setRoutePoints([]);
-                setShowRoutePanel(false); // ukryj panel przy wyłączeniu trybu
-              }
-            }}
-          >
-            {routeMode ? "Zakończ tryb trasy" : "Tryb trasy"}
-          </button>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedProducent}
-              onChange={(e) => setSelectedProducent(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Wszyscy producenci</option>
-              {producenci.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+        {/* Przycisk trybu trasy i filtry tylko dla admina */}
+        {userRole === "admin" && (
+          <div className="flex justify-between items-center mb-4">
             <button
-              onClick={handleFilter}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              className={`px-4 py-2 rounded text-white ${
+                routeMode ? "bg-yellow-600" : "bg-gray-800"
+              } hover:bg-yellow-700`}
+              onClick={() => {
+                setRouteMode(!routeMode);
+                if (routeMode) {
+                  setRoutePoints([]);
+                  setShowRoutePanel(false);
+                }
+              }}
             >
-              Filtruj
+              {routeMode ? "Zakończ tryb trasy" : "Tryb trasy"}
             </button>
-            <button
-              onClick={clearFilter}
-              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-            >
-              Wyczyść
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedProducent}
+                onChange={(e) => setSelectedProducent(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">Wszyscy producenci</option>
+                {producenci.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleFilter}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              >
+                Filtruj
+              </button>
+              <button
+                onClick={clearFilter}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              >
+                Wyczyść
+              </button>
+            </div>
+            {routeMode && (
+              <button
+                className="bg-indigo-700 text-white px-4 py-2 rounded hover:bg-indigo-800"
+                onClick={() => setShowRoutePanel((prev) => !prev)}
+              >
+                🧭 Trasa ({routePoints.length})
+              </button>
+            )}
           </div>
-
-          {routeMode && (
-            <button
-              className="bg-indigo-700 text-white px-4 py-2 rounded hover:bg-indigo-800"
-              onClick={() => setShowRoutePanel((prev) => !prev)}
-            >
-              🧭 Trasa ({routePoints.length})
-            </button>
-          )}
-        </div>
+        )}
         {loading && <p className="text-center">Ładowanie mapy...</p>}
 
         {!loading && points.length === 0 && (
@@ -413,8 +449,8 @@ export default function Mapa() {
                       >
                         Nawiguj
                       </button>
-
-                      {routeMode && (
+                      {/* Dodawanie do trasy tylko dla admina */}
+                      {userRole === "admin" && routeMode && (
                         <button
                           className={`px-3 py-1 rounded text-xs ${
                             isPointInRoute(point)
@@ -440,7 +476,8 @@ export default function Mapa() {
             ))}
           </MapWithNoSSR>
         )}
-        {routeMode && showRoutePanel && (
+        {/* Panel trasy tylko dla admina */}
+        {userRole === "admin" && routeMode && showRoutePanel && (
           <div
             className="fixed inset-0 flex justify-center items-center z-50 modal-preview overflow-y-auto"
             style={{ background: "rgba(0, 0, 0, 0.4)" }}

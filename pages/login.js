@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "next/router";
 import Image from "next/image";
+import { APP_VERSION } from "../lib/version";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -74,7 +75,8 @@ export default function Login() {
         </form>
 
         <p className="mt-6 text-sm text-gray-500">
-          © Powered by <span className="text-indigo-600 font-bold">CP&BS</span>.
+          © Powered by <span className="text-indigo-600 font-bold">CP&BS</span>
+          .<span className="ml-2 text-gray-400">Ver. {APP_VERSION}</span>
         </p>
       </div>
 

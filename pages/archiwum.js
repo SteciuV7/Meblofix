@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Clock } from "lucide-react";
 import Tippy from "@tippyjs/react";
 import "tippy.js/dist/tippy.css";
 import { Truck } from "lucide-react";
+import { APP_VERSION } from "../lib/version";
 
 export default function Reklamacje() {
   const [selectedReklamacja, setSelectedReklamacja] = useState(null);
@@ -381,7 +382,9 @@ export default function Reklamacje() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 9.0</span>
+          <span className="text-sm text-gray-400 font-normal">
+            Ver. {APP_VERSION}
+          </span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">
@@ -559,8 +562,8 @@ export default function Reklamacje() {
                         calculateRemainingTime(r.realizacja_do) <= 5
                           ? "bg-red-500"
                           : calculateRemainingTime(r.realizacja_do) <= 10
-                          ? "bg-yellow-500"
-                          : "bg-green-500"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
                       }`}
                     >
                       {calculateRemainingTime(r.realizacja_do) <= 5 ? (
@@ -584,14 +587,14 @@ export default function Reklamacje() {
                         r.status === "Zgłoszone"
                           ? "bg-yellow-500"
                           : r.status === "Zakończone"
-                          ? "bg-green-500"
-                          : r.status === "W trakcie realizacji"
-                          ? "bg-blue-500"
-                          : r.status === "Oczekuje na informacje"
-                          ? "bg-red-500"
-                          : r.status === "Zaktualizowano"
-                          ? "bg-orange-500"
-                          : "bg-gray-500"
+                            ? "bg-green-500"
+                            : r.status === "W trakcie realizacji"
+                              ? "bg-blue-500"
+                              : r.status === "Oczekuje na informacje"
+                                ? "bg-red-500"
+                                : r.status === "Zaktualizowano"
+                                  ? "bg-orange-500"
+                                  : "bg-gray-500"
                       } hover:opacity-80 transition`}
                     >
                       {r.status}

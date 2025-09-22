@@ -12,6 +12,7 @@ import Tippy from "@tippyjs/react";
 import "tippy.js/dist/tippy.css";
 import { Truck } from "lucide-react";
 import { geocodeAddress } from "../lib/geocode";
+import { APP_VERSION } from "../lib/version";
 import {
   validatePostalCode,
   filterPostalOnChange,
@@ -656,7 +657,9 @@ export default function Reklamacje() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 9.1</span>
+          <span className="text-sm text-gray-400 font-normal">
+            Ver. {APP_VERSION}
+          </span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">

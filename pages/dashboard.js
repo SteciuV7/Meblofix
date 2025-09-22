@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useRouter } from "next/router";
 import { FiLogOut } from "react-icons/fi"; // Zachowano działającą ikonę
 import { FaUser, FaArchive, FaWrench, FaCar, FaGlobe } from "react-icons/fa"; // Poprawione ikonki
+import { APP_VERSION } from "../lib/version";
 
 export default function Dashboard() {
   const [role, setRole] = useState(null);
@@ -104,7 +105,9 @@ export default function Dashboard() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 9.1</span>
+          <span className="text-sm text-gray-400 font-normal">
+            Ver. {APP_VERSION}
+          </span>
         </h1>
 
         {/* Informacje o użytkowniku */}

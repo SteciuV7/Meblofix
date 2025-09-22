@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "next/router";
 import { FiLogOut } from "react-icons/fi";
+import { APP_VERSION } from "../lib/version";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -225,7 +226,9 @@ export default function Users() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 9.1</span>
+          <span className="text-sm text-gray-400 font-normal">
+            Ver. {APP_VERSION}
+          </span>
         </h1>
 
         <div className="relative">

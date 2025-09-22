@@ -5,6 +5,7 @@ import { FiLogOut } from "react-icons/fi";
 import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 import { geocodeAddress } from "../lib/geocode";
+import { APP_VERSION } from "../lib/version";
 
 // Dynamiczne komponenty Leaflet
 const MapWithNoSSR = dynamic(
@@ -22,6 +23,11 @@ const Marker = dynamic(
 const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
   ssr: false,
 });
+// Dodaj import dynamiczny MarkerClusterGroup
+const MarkerClusterGroup = dynamic(
+  () => import("react-leaflet-markercluster"),
+  { ssr: false }
+);
 
 // Funkcja dodająca przesunięcie tylko dla duplikatów współrzędnych
 function spreadMarkers(points) {
@@ -72,6 +78,7 @@ export default function Mapa() {
   });
 
   const [showPopup, setShowPopup] = useState(false);
+  const [clusterEnabled, setClusterEnabled] = useState(false); // przełącznik klastrów
 
   const getColorIcon = (status) => {
     if (typeof window === "undefined") return null;
@@ -264,6 +271,31 @@ export default function Mapa() {
     setPoints(spreadMarkers(allPoints));
   };
 
+  // Funkcja do generowania własnego wyglądu klastra
+  function getClusterColor(count) {
+    if (count < 10) return "#4ade80"; // zielony
+    if (count < 20) return "#facc15"; // żółty
+    if (count < 50) return "#f97316"; // pomarańczowy
+    return "#ef4444"; // czerwony
+  }
+
+  function createClusterCustomIcon(cluster) {
+    const count = cluster.getChildCount();
+    const color = getClusterColor(count);
+    // Kwadratowy div z liczbą
+    return window.L.divIcon({
+      html: `<div class="custom-cluster" style="background:${color}">${count}</div>`,
+      className: "custom-cluster-wrapper",
+      iconSize: [40, 40],
+    });
+  }
+
+  // Dodaj funkcję handleLogout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <header className="bg-gray-900 text-white py-5 px-8 flex justify-between items-center shadow-lg">
@@ -272,7 +304,9 @@ export default function Mapa() {
           onClick={() => router.push("/dashboard")}
         >
           <span>Meblofix Sp. z o.o.</span>
-          <span className="text-sm text-gray-400 font-normal">Ver. 9.1</span>
+          <span className="text-sm text-gray-400 font-normal">
+            Ver. {APP_VERSION}
+          </span>
         </h1>
         <div className="relative">
           <div className="flex items-center space-x-4">
@@ -335,6 +369,37 @@ export default function Mapa() {
             >
               {routeMode ? "Zakończ tryb trasy" : "Tryb trasy"}
             </button>
+            {/* --- PRZEŁĄCZNIK KLASTRÓW tylko dla admina --- */}
+            <div className="flex flex-col items-center">
+              <label className="flex items-center cursor-pointer select-none">
+                <span className="mr-2 font-medium text-gray-700">
+                  Grupowanie
+                </span>
+                <span className="relative">
+                  <input
+                    type="checkbox"
+                    checked={clusterEnabled}
+                    onChange={() => setClusterEnabled((v) => !v)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`block w-10 h-6 rounded-full transition ${
+                      clusterEnabled ? "bg-green-500" : "bg-gray-400"
+                    }`}
+                  ></span>
+                  <span
+                    className={`dot absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition ${
+                      clusterEnabled ? "translate-x-4" : ""
+                    }`}
+                    style={{
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                      transition: "transform 0.2s",
+                    }}
+                  ></span>
+                </span>
+              </label>
+            </div>
+            {/* --- KONIEC PRZEŁĄCZNIKA --- */}
             <div className="flex items-center gap-2">
               <select
                 value={selectedProducent}
@@ -388,92 +453,189 @@ export default function Mapa() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
 
-            {points.map((point, idx) => (
-              <Marker
-                key={idx}
-                position={[point.lat, point.lon]}
-                icon={getColorIcon(point.status)}
+            {/* --- Markery w klastrze lub bez --- */}
+            {clusterEnabled ? (
+              <MarkerClusterGroup
+                iconCreateFunction={createClusterCustomIcon}
+                disableClusteringAtZoom={10}
               >
-                <Popup>
-                  <div className="text-sm space-y-1">
-                    <p>
-                      <strong>Firma:</strong> {point.nazwa_firmy}
-                    </p>
-                    <p>
-                      <strong>Status:</strong> {point.status}
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <strong>Adres:</strong> {point.adres}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(point.adres);
-                          alert("Adres skopiowany do schowka!");
-                        }}
-                        className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-200 transition"
-                        title="Skopiuj adres"
-                      >
-                        Kopiuj
-                      </button>
-                    </p>
-                    <p>
-                      <strong>Termin realizacji:</strong>{" "}
-                      {point.realizacja_do?.split("T")[0]}
-                    </p>
-                    <p>
-                      <strong>Numer reklamacji:</strong> {point.numer_faktury}
-                    </p>
-                    <p>
-                      <strong>Opis:</strong> {point.opis}
-                    </p>
+                {points.map((point, idx) => (
+                  <Marker
+                    key={idx}
+                    position={[point.lat, point.lon]}
+                    icon={getColorIcon(point.status)}
+                  >
+                    <Popup>
+                      <div className="text-sm space-y-1">
+                        <p>
+                          <strong>Firma:</strong> {point.nazwa_firmy}
+                        </p>
+                        <p>
+                          <strong>Status:</strong> {point.status}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <strong>Adres:</strong> {point.adres}
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(point.adres);
+                              alert("Adres skopiowany do schowka!");
+                            }}
+                            className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-200 transition"
+                            title="Skopiuj adres"
+                          >
+                            Kopiuj
+                          </button>
+                        </p>
+                        <p>
+                          <strong>Termin realizacji:</strong>{" "}
+                          {point.realizacja_do?.split("T")[0]}
+                        </p>
+                        <p>
+                          <strong>Numer reklamacji:</strong>{" "}
+                          {point.numer_faktury}
+                        </p>
+                        <p>
+                          <strong>Opis:</strong> {point.opis}
+                        </p>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
-                        onClick={() => {
-                          setSelectedReklamacja(point);
-                          setIsPreviewOpen(true);
-                        }}
-                      >
-                        Podgląd
-                      </button>
-                      <button
-                        onClick={() =>
-                          window.open(
-                            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                              point.adres
-                            )}`,
-                            "_blank"
-                          )
-                        }
-                        className="bg-gray-700 text-white px-3 py-1 rounded text-xs hover:bg-gray-800 transition"
-                      >
-                        Nawiguj
-                      </button>
-                      {/* Dodawanie do trasy tylko dla admina */}
-                      {userRole === "admin" && routeMode && (
-                        <button
-                          className={`px-3 py-1 rounded text-xs ${
-                            isPointInRoute(point)
-                              ? "bg-green-600 cursor-default"
-                              : "bg-yellow-500 hover:bg-yellow-600"
-                          } text-white transition`}
-                          onClick={() => {
-                            if (!isPointInRoute(point)) {
-                              setRoutePoints((prev) => [...prev, point]);
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+                            onClick={() => {
+                              setSelectedReklamacja(point);
+                              setIsPreviewOpen(true);
+                            }}
+                          >
+                            Podgląd
+                          </button>
+                          <button
+                            onClick={() =>
+                              window.open(
+                                `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                  point.adres
+                                )}`,
+                                "_blank"
+                              )
                             }
+                            className="bg-gray-700 text-white px-3 py-1 rounded text-xs hover:bg-gray-800 transition"
+                          >
+                            Nawiguj
+                          </button>
+                          {/* Dodawanie do trasy tylko dla admina */}
+                          {userRole === "admin" && routeMode && (
+                            <button
+                              className={`px-3 py-1 rounded text-xs ${
+                                isPointInRoute(point)
+                                  ? "bg-green-600 cursor-default"
+                                  : "bg-yellow-500 hover:bg-yellow-600"
+                              } text-white transition`}
+                              onClick={() => {
+                                if (!isPointInRoute(point)) {
+                                  setRoutePoints((prev) => [...prev, point]);
+                                }
+                              }}
+                              disabled={isPointInRoute(point)}
+                            >
+                              {isPointInRoute(point)
+                                ? "✅ Dodano"
+                                : "➕ Dodaj do trasy"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MarkerClusterGroup>
+            ) : (
+              points.map((point, idx) => (
+                <Marker
+                  key={idx}
+                  position={[point.lat, point.lon]}
+                  icon={getColorIcon(point.status)}
+                >
+                  <Popup>
+                    <div className="text-sm space-y-1">
+                      <p>
+                        <strong>Firma:</strong> {point.nazwa_firmy}
+                      </p>
+                      <p>
+                        <strong>Status:</strong> {point.status}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <strong>Adres:</strong> {point.adres}
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(point.adres);
+                            alert("Adres skopiowany do schowka!");
                           }}
-                          disabled={isPointInRoute(point)}
+                          className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-200 transition"
+                          title="Skopiuj adres"
                         >
-                          {isPointInRoute(point)
-                            ? "✅ Dodano"
-                            : "➕ Dodaj do trasy"}
+                          Kopiuj
                         </button>
-                      )}
+                      </p>
+                      <p>
+                        <strong>Termin realizacji:</strong>{" "}
+                        {point.realizacja_do?.split("T")[0]}
+                      </p>
+                      <p>
+                        <strong>Numer reklamacji:</strong> {point.numer_faktury}
+                      </p>
+                      <p>
+                        <strong>Opis:</strong> {point.opis}
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+                          onClick={() => {
+                            setSelectedReklamacja(point);
+                            setIsPreviewOpen(true);
+                          }}
+                        >
+                          Podgląd
+                        </button>
+                        <button
+                          onClick={() =>
+                            window.open(
+                              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                point.adres
+                              )}`,
+                              "_blank"
+                            )
+                          }
+                          className="bg-gray-700 text-white px-3 py-1 rounded text-xs hover:bg-gray-800 transition"
+                        >
+                          Nawiguj
+                        </button>
+                        {/* Dodawanie do trasy tylko dla admina */}
+                        {userRole === "admin" && routeMode && (
+                          <button
+                            className={`px-3 py-1 rounded text-xs ${
+                              isPointInRoute(point)
+                                ? "bg-green-600 cursor-default"
+                                : "bg-yellow-500 hover:bg-yellow-600"
+                            } text-white transition`}
+                            onClick={() => {
+                              if (!isPointInRoute(point)) {
+                                setRoutePoints((prev) => [...prev, point]);
+                              }
+                            }}
+                            disabled={isPointInRoute(point)}
+                          >
+                            {isPointInRoute(point)
+                              ? "✅ Dodano"
+                              : "➕ Dodaj do trasy"}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+                  </Popup>
+                </Marker>
+              ))
+            )}
+            {/* --- KONIEC --- */}
           </MapWithNoSSR>
         )}
         {/* Panel trasy tylko dla admina */}
@@ -677,6 +839,38 @@ export default function Mapa() {
           </div>
         )}
       </div>
+
+      <style jsx global>{`
+        .custom-cluster-wrapper {
+          background: transparent !important;
+          border: none !important;
+        }
+        .custom-cluster {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: 8px;
+          font-weight: bold;
+          font-size: 1.2rem;
+          color: #fff;
+          border: 2px solid #fff;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          transition: background 0.2s;
+          user-select: none;
+        }
+        /* Styl switcha */
+        .dot {
+          position: absolute;
+          top: 1px;
+          left: 1px;
+          transition: transform 0.2s;
+        }
+        input[type="checkbox"]:checked + span + .dot {
+          transform: translateX(16px);
+        }
+      `}</style>
     </div>
   );
 }

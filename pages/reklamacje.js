@@ -1334,6 +1334,22 @@ export default function Reklamacje() {
                 }
                 onClick={async () => {
                   // ✅ OSTATECZNA WALIDACJA FRONTOWA
+                  const isRealizacjaDateToday = () => {
+                    const today = new Date();
+                    return (
+                      realizacjaDate.getDate() === today.getDate() &&
+                      realizacjaDate.getMonth() === today.getMonth() &&
+                      realizacjaDate.getFullYear() === today.getFullYear()
+                    );
+                  };
+
+                  if (isRealizacjaDateToday()) {
+                    alert(
+                      "Proszę wybrać termin realizacji inny niż dzisiejszy."
+                    );
+                    return;
+                  }
+
                   const postalOk = validatePostalCode(
                     newReklamacja.kod_pocztowy
                   );
@@ -1986,6 +2002,22 @@ export default function Reklamacje() {
                 onClick={async () => {
                   try {
                     // ✂️ sprzątanie tuż przed zapisem (spójne porównania + geokodowanie)
+                    const isRealizacjaDateToday = () => {
+                      const today = new Date();
+                      return (
+                        realizacjaDate.getDate() === today.getDate() &&
+                        realizacjaDate.getMonth() === today.getMonth() &&
+                        realizacjaDate.getFullYear() === today.getFullYear()
+                      );
+                    };
+
+                    if (isRealizacjaDateToday()) {
+                      alert(
+                        "Proszę wybrać termin realizacji inny niż dzisiejszy."
+                      );
+                      return;
+                    }
+
                     const sanitizedTown = sanitizeTown(
                       selectedReklamacja.miejscowosc || ""
                     ).trim();

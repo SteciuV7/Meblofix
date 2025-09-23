@@ -1368,12 +1368,8 @@ export default function Reklamacje() {
                     ).trim();
 
                     // 🧭 Geokodowanie z pełnym scoringiem (ulica + numer + miasto + kod)
-                    const fullAddress = `${sanitizedTown}, ${sanitizedPostal} ${sanitizedAddr}`; // Np. "Gliwice, 44-100 Dolna 7/4"
-                    const coords = await geocodeAddress(fullAddress, {
-                      miejscowosc: sanitizedTown,
-                      kod: sanitizedPostal,
-                      ulica: sanitizedAddr,
-                    });
+                    const fullAddress = `${sanitizedAddr}, ${sanitizedTown}, ${sanitizedPostal}`; // Np. "Jana III Sobieskiego 12A/4, Gliwice, 44-100"
+                    const coords = await geocodeAddress(fullAddress);
 
                     if (
                       !coords ||
@@ -2114,12 +2110,8 @@ export default function Reklamacje() {
 
                     // jeśli wyzerowaliśmy współrzędne – spróbuj geokodować na świeżo (z ulicą/miastem/kodem)
                     if (adresZmieniony) {
-                      const fullAddress = `${sanitizedTown}, ${sanitizedPostal} ${sanitizedAddr}`;
-                      const coords = await geocodeAddress(fullAddress, {
-                        miejscowosc: sanitizedTown,
-                        kod: sanitizedPostal,
-                        ulica: sanitizedAddr,
-                      });
+                      const fullAddress = `${sanitizedAddr}, ${sanitizedTown}, ${sanitizedPostal}`;
+                      const coords = await geocodeAddress(fullAddress);
 
                       if (
                         coords &&

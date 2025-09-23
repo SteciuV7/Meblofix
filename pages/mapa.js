@@ -181,8 +181,8 @@ export default function Mapa() {
 
       // ⚠️ kolejno, żeby nie wyjechać poza limity API
       for (const rek of data) {
-        // standardowa kolejność: "Miasto, Kod Ulica nr"
-        const fullAddress = `${rek.miejscowosc}, ${rek.kod_pocztowy} ${rek.adres}`;
+        // standardowa kolejność: "Ulica nr, Miasto, Kod"
+        const fullAddress = `${rek.adres}, ${rek.miejscowosc}, ${rek.kod_pocztowy}`;
 
         // 1) sentinel 52/20 traktuj jako błąd – nie dodawaj na mapę
         if (rek.lat === 52 && rek.lon === 20) {
@@ -197,12 +197,8 @@ export default function Mapa() {
           continue;
         }
 
-        // 3) geokoduj brakujące – PRZEKAZUJEMY MIASTO/KOD/ULICĘ
-        const coords = await geocodeAddress(fullAddress, {
-          miejscowosc: rek.miejscowosc || "",
-          kod: rek.kod_pocztowy || "",
-          ulica: rek.adres || "",
-        });
+        // 3) geokoduj brakujące – PRZEKAZUJEMY CAŁY ADRES
+        const coords = await geocodeAddress(fullAddress);
 
         if (coords) {
           przetworzone++;

@@ -61,6 +61,7 @@ export default function Mapa() {
   const [allPoints, setAllPoints] = useState([]); // Wszystkie punkty
   const [producenci, setProducenci] = useState([]);
   const [selectedProducent, setSelectedProducent] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
   const isPointInRoute = (point) => routePoints.some((p) => p.id === point.id);
   const [showRoutePanel, setShowRoutePanel] = useState(false);
   const [defaultIcon, setDefaultIcon] = useState(null);
@@ -254,16 +255,22 @@ export default function Mapa() {
   }, [fetchData, userRole]);
 
   const handleFilter = () => {
+    let filtered = allPoints;
+
     if (selectedProducent) {
-      const filtered = allPoints.filter(
-        (p) => p.nazwa_firmy === selectedProducent
-      );
-      setPoints(spreadMarkers(filtered));
+      filtered = filtered.filter((p) => p.nazwa_firmy === selectedProducent);
     }
+
+    if (selectedStatus) {
+      filtered = filtered.filter((p) => p.status === selectedStatus);
+    }
+
+    setPoints(spreadMarkers(filtered));
   };
 
   const clearFilter = () => {
     setSelectedProducent("");
+    setSelectedStatus("");
     setPoints(spreadMarkers(allPoints));
   };
 
@@ -408,6 +415,22 @@ export default function Mapa() {
                     {p}
                   </option>
                 ))}
+              </select>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">Wszystkie statusy</option>
+                <option value="Zgłoszone">Zgłoszone</option>
+                <option value="Zaktualizowano">Zaktualizowano</option>
+                <option value="W trakcie realizacji">
+                  W trakcie realizacji
+                </option>
+                <option value="Oczekuje na informacje">
+                  Oczekuje na informacje
+                </option>
+                <option value="Oczekuje na dostawę">Oczekuje na dostawę</option>
               </select>
               <button
                 onClick={handleFilter}

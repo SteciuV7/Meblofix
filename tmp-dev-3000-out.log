@@ -1,0 +1,16 @@
+
+> meblofix@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.14
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.65:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1455ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 2.2s (437 modules)
+ GET /login 200 in 2585ms
+ ✓ Compiled /api/trasy/candidates in 172ms (205 modules)
+ GET /api/trasy/candidates 401 in 285ms

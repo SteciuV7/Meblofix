@@ -1,0 +1,12 @@
+[api] 401 Error: Brak autoryzacji.
+    at requireApiUser (lib\server\auth.js:49:19)
+    at handler (pages\api\trasy\candidates.js:11:25)
+  47 |   const token = getBearerToken(req);
+  48 |   if (!token) {
+> 49 |     const error = new Error("Brak autoryzacji.");
+     |                   ^
+  50 |     error.statusCode = 401;
+  51 |     throw error;
+  52 |   } {
+  statusCode: 401
+}

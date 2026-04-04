@@ -45,11 +45,22 @@ export default function Users() {
         return;
       }
 
-      const { data: userData, error: roleError } = await supabase
+      let { data: userData, error: roleError } = await supabase
         .from("firmy")
         .select("rola")
-        .eq("email", user.email)
-        .single();
+        .eq("firma_id", user.id)
+        .maybeSingle();
+
+      if (!userData && !roleError) {
+        const fallback = await supabase
+          .from("firmy")
+          .select("rola")
+          .eq("email", user.email)
+          .maybeSingle();
+
+        userData = fallback.data;
+        roleError = fallback.error;
+      }
 
       if (roleError) {
         console.error("Błąd pobierania roli:", roleError.message);

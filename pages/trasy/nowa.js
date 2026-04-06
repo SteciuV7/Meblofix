@@ -1,6 +1,11 @@
 import dynamic from "next/dynamic";
 import { AppShell } from "@/components/layout/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
+import {
+  RouteBaseCard,
+  RouteEtaBadge,
+  RouteLegConnector,
+} from "@/components/trasy/RouteTiming";
 import { ROLE } from "@/lib/constants";
 import { apiFetch } from "@/lib/client-api";
 import { useCurrentProfile } from "@/lib/use-current-profile";
@@ -8,9 +13,12 @@ import {
   formatDate,
   formatDistance,
   formatDuration,
+  getComplaintCustomerName,
+  getPhoneHref,
   normalizeText,
 } from "@/lib/utils";
 import Link from "next/link";
+import { PhoneCall } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
@@ -241,6 +249,9 @@ export default function NewRoutePage() {
       const haystack = normalizeText(
         [
           candidate.nazwa_firmy,
+          candidate.imie_klienta,
+          candidate.nazwisko_klienta,
+          candidate.telefon_klienta,
           candidate.numer_faktury,
           candidate.nr_reklamacji,
           candidate.kod_pocztowy,
@@ -267,6 +278,7 @@ export default function NewRoutePage() {
   );
 
   const activeSettings = preview?.settings || operationalSettings;
+  const routeBaseAddress = activeSettings?.adres_bazy || "Brak aktywnej bazy";
 
   async function handleCreateRoute() {
     try {
@@ -353,7 +365,7 @@ export default function NewRoutePage() {
       fullWidth
     >
       <div className="space-y-6">
-        <section className="space-y-6">
+        <section className="min-w-0 space-y-6">
           <div className="grid gap-4 xl:grid-cols-3">
             <label className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
               <div className="font-semibold text-slate-900">Planowany start</div>
@@ -419,7 +431,7 @@ export default function NewRoutePage() {
               </div>
             </div>
 
-            <div className="grid gap-0 lg:grid-cols-2">
+            <div className="grid min-w-0 gap-0 lg:grid-cols-2">
               <div className="border-b border-slate-200 lg:border-b-0 lg:border-r">
                 <div className="border-b border-slate-200 px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
@@ -436,7 +448,7 @@ export default function NewRoutePage() {
                       type="text"
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Szukaj po firmie, adresie, kodzie, numerze faktury..."
+                      placeholder="Szukaj po firmie, kliencie, telefonie, adresie lub numerze faktury..."
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-sky-500"
                     />
                   </div>
@@ -448,18 +460,22 @@ export default function NewRoutePage() {
                   ) : null}
                 </div>
 
-                <div className="h-[720px] space-y-4 overflow-y-auto px-4 py-4">
+                <div className="h-[60vh] min-h-[420px] space-y-4 overflow-y-auto px-4 py-4 md:h-[720px]">
                   {filteredCandidates.length ? (
                     filteredCandidates.map((candidate) => {
                       const theme =
                         DEADLINE_THEMES[candidate.tone] || DEADLINE_THEMES.blue;
+                      const customerName = getComplaintCustomerName(candidate);
+                      const customerPhoneHref = getPhoneHref(
+                        candidate.telefon_klienta
+                      );
 
                       return (
                         <div
                           key={candidate.id}
                           className={`rounded-[1.5rem] border p-4 shadow-sm ${theme.card}`}
                         >
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-3">
                                 <span className={`h-3 w-3 rounded-full ${theme.accent}`} />
@@ -478,17 +494,21 @@ export default function NewRoutePage() {
                                   {candidate.kod_pocztowy} {candidate.miejscowosc},{" "}
                                   {candidate.adres}
                                 </div>
+                                {customerName ? <div>Klient: {customerName}</div> : null}
+                                {candidate.telefon_klienta ? (
+                                  <div>
+                                    Telefon:{" "}
+                                    <a
+                                      href={customerPhoneHref || "#"}
+                                      className="font-medium text-emerald-700 hover:text-emerald-800"
+                                    >
+                                      {candidate.telefon_klienta}
+                                    </a>
+                                  </div>
+                                ) : null}
                                 <div>
                                   Termin: {formatDate(candidate.realizacja_do, true)}
                                 </div>
-                                {candidate.eta_from ? (
-                                  <div>
-                                    ETA: {formatDate(candidate.eta_from, true)}
-                                    {candidate.eta_to
-                                      ? ` - ${formatDate(candidate.eta_to, true)}`
-                                      : ""}
-                                  </div>
-                                ) : null}
                               </div>
 
                               <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -507,17 +527,24 @@ export default function NewRoutePage() {
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                                candidate.selected
-                                  ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
-                                  : "bg-sky-500 text-white hover:bg-sky-400"
-                              }`}
-                              onClick={() => toggleCandidate(candidate.id)}
-                            >
-                              {candidate.selected ? "Usun" : "Dodaj"}
-                            </button>
+                            <div className="flex shrink-0 flex-col gap-3 sm:items-end">
+                              <RouteEtaBadge
+                                etaFrom={candidate.eta_from}
+                                etaTo={candidate.eta_to}
+                                className="w-full sm:w-[210px]"
+                              />
+                              <button
+                                type="button"
+                                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                                  candidate.selected
+                                    ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                                    : "bg-sky-500 text-white hover:bg-sky-400"
+                                }`}
+                                onClick={() => toggleCandidate(candidate.id)}
+                              >
+                                {candidate.selected ? "Usun" : "Dodaj"}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -548,12 +575,12 @@ export default function NewRoutePage() {
                   </div>
                 </div>
 
-                <div className="p-4">
+                <div className="min-w-0 p-4">
                   <RouteMap
                     base={activeSettings}
                     stops={mapStops}
                     encodedPolyline={preview?.encodedPolyline}
-                    height="720px"
+                    height="clamp(320px, 60vh, 720px)"
                     renderStopActions={(stop) => (
                       <button
                         type="button"
@@ -579,8 +606,8 @@ export default function NewRoutePage() {
             </div>
           ) : null}
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+          <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
+            <div className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">Wybrane punkty</h2>
                 {manualOrder ? (
@@ -599,57 +626,138 @@ export default function NewRoutePage() {
               </div>
 
               {selectedStops.length ? (
-                <div className="mt-5 space-y-4">
-                  {selectedStops.map((stop, index) => (
-                    <div
-                      key={stop.id}
-                      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                            Punkt {index + 1}
-                          </div>
-                          <div className="mt-2 text-lg font-semibold text-slate-900">
-                            {stop.nazwa_firmy}
-                          </div>
-                          <div className="mt-1 text-sm text-slate-600">
-                            {stop.miejscowosc}, {stop.adres}
-                          </div>
-                          {stop.eta_from ? (
-                            <div className="mt-2 text-xs text-slate-500">
-                              ETA: {formatDate(stop.eta_from, true)}
-                              {stop.eta_to ? ` - ${formatDate(stop.eta_to, true)}` : ""}
-                            </div>
-                          ) : null}
-                        </div>
+                <div className="mt-5 space-y-1">
+                  <RouteBaseCard
+                    title="Start z magazynu"
+                    address={routeBaseAddress}
+                    caption={
+                      planowanyStartAt
+                        ? `Planowany start: ${formatDate(
+                            new Date(planowanyStartAt).toISOString(),
+                            true
+                          )}`
+                        : "Punkt poczatkowy trasy"
+                    }
+                  />
+                  {selectedStops[0]?.duration_from_prev_s != null ? (
+                    <RouteLegConnector
+                      durationSeconds={selectedStops[0].duration_from_prev_s}
+                      label="Dojazd z magazynu do punktu 1"
+                    />
+                  ) : null}
 
-                        <div className="flex flex-col gap-2">
-                          <button
-                            type="button"
-                            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-                            onClick={() => moveCandidate(stop.id, -1)}
-                          >
-                            W gore
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-                            onClick={() => moveCandidate(stop.id, 1)}
-                          >
-                            W dol
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
-                            onClick={() => removeCandidate(stop.id)}
-                          >
-                            Usun
-                          </button>
+                  {selectedStops.map((stop, index) => {
+                    const customerName = getComplaintCustomerName(stop);
+                    const customerPhoneHref = getPhoneHref(stop.telefon_klienta);
+
+                    return (
+                      <div key={stop.id}>
+                        <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                Punkt {index + 1}
+                              </div>
+                              <div className="mt-2 text-lg font-semibold text-slate-900">
+                                {stop.nazwa_firmy}
+                              </div>
+                              <div className="mt-1 text-sm text-slate-600">
+                                {stop.miejscowosc}, {stop.adres}
+                              </div>
+                              {customerName || stop.telefon_klienta ? (
+                                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                                  <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200">
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                      Imie
+                                    </div>
+                                    <div className="mt-2 font-semibold text-slate-950">
+                                      {stop.imie_klienta || "-"}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200">
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                      Nazwisko
+                                    </div>
+                                    <div className="mt-2 font-semibold text-slate-950">
+                                      {stop.nazwisko_klienta || "-"}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-100 sm:col-span-3 lg:col-span-1">
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                                      Telefon
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <div className="font-semibold text-emerald-950">
+                                        {stop.telefon_klienta || "-"}
+                                      </div>
+                                      {stop.telefon_klienta ? (
+                                        <a
+                                          href={customerPhoneHref || "#"}
+                                          aria-label={`Zadzwon do ${customerName || "klienta"}`}
+                                          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-100 hover:text-emerald-800"
+                                        >
+                                          <PhoneCall className="h-4 w-4" />
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="flex flex-col gap-3 sm:items-end">
+                              <RouteEtaBadge
+                                etaFrom={stop.eta_from}
+                                etaTo={stop.eta_to}
+                                className="w-full sm:w-[220px]"
+                              />
+                              <div className="flex flex-wrap gap-2 sm:justify-end">
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                                  onClick={() => moveCandidate(stop.id, -1)}
+                                >
+                                  W gore
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                                  onClick={() => moveCandidate(stop.id, 1)}
+                                >
+                                  W dol
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                                  onClick={() => removeCandidate(stop.id)}
+                                >
+                                  Usun
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
+                        {selectedStops[index + 1] ? (
+                          <RouteLegConnector
+                            durationSeconds={selectedStops[index + 1].duration_from_prev_s}
+                          />
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+
+                  {preview?.returnLegDurationSeconds != null ? (
+                    <RouteLegConnector
+                      durationSeconds={preview.returnLegDurationSeconds}
+                      label="Dojazd do magazynu"
+                    />
+                  ) : null}
+                  <RouteBaseCard
+                    title="Powrot do magazynu"
+                    address={routeBaseAddress}
+                    caption="Punkt koncowy trasy"
+                    etaFrom={preview?.returnEtaAt}
+                  />
                 </div>
               ) : (
                 <div className="mt-5 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center text-sm text-slate-500">
@@ -658,7 +766,7 @@ export default function NewRoutePage() {
               )}
             </div>
 
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6">
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
                 <h2 className="text-xl font-semibold">Podsumowanie</h2>
 

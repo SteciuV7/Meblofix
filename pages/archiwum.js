@@ -64,6 +64,10 @@ export default function ArchiwumPage() {
       normalizeText(
         [
           reklamacja.nazwa_firmy,
+          reklamacja.imie_klienta,
+          reklamacja.nazwisko_klienta,
+          reklamacja.telefon_klienta,
+          reklamacja.nr_reklamacji,
           reklamacja.numer_faktury,
           reklamacja.miejscowosc,
           reklamacja.adres,

@@ -41,7 +41,6 @@ export default async function handler(req, res) {
     const {
       reklamacjeIds = [],
       planowanyStartAt,
-      driverFirmaId,
       routeName,
       notes,
       dryRun = false,
@@ -65,7 +64,6 @@ export default async function handler(req, res) {
     const result = await createRoute({
       reklamacjeIds,
       planowanyStartAt,
-      driverFirmaId,
       routeName,
       notes,
       actor,

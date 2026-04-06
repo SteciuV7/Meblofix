@@ -5,7 +5,6 @@ import { ROLE, ROUTE_STATUS } from "@/lib/constants";
 import { apiFetch } from "@/lib/client-api";
 import { useCurrentProfile } from "@/lib/use-current-profile";
 import {
-  dayKey,
   formatDate,
   formatDistance,
   formatDuration,
@@ -21,7 +20,7 @@ export default function RoutesListPage() {
   const [routes, setRoutes] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [filters, setFilters] = useState({
-    dateFrom: dayKey(new Date()),
+    dateFrom: "",
     dateTo: "",
     statuses: "",
   });
@@ -154,7 +153,6 @@ export default function RoutesListPage() {
                     <th className="px-4 py-3 font-medium">Trasa</th>
                     <th className="px-4 py-3 font-medium">Data</th>
                     <th className="px-4 py-3 font-medium">Start</th>
-                    <th className="px-4 py-3 font-medium">Kierowca</th>
                     <th className="px-4 py-3 font-medium">Dystans</th>
                     <th className="px-4 py-3 font-medium">Czas</th>
                     <th className="px-4 py-3 font-medium">Status</th>
@@ -173,9 +171,6 @@ export default function RoutesListPage() {
                       <td className="px-4 py-4 text-slate-700">{formatDate(route.data_trasy)}</td>
                       <td className="px-4 py-4 text-slate-700">
                         {formatDate(route.planowany_start_at, true)}
-                      </td>
-                      <td className="px-4 py-4 text-slate-700">
-                        {route.driver?.nazwa_firmy || route.driver?.email || "—"}
                       </td>
                       <td className="px-4 py-4 text-slate-700">
                         {formatDistance(route.total_distance_m)}

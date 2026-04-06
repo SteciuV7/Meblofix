@@ -1,6 +1,11 @@
 import { StatusBadge } from "@/components/StatusBadge";
+import { RouteEtaBadge } from "@/components/trasy/RouteTiming";
 import { getPublicStorageUrl } from "@/lib/storage";
-import { formatDate, toNumber } from "@/lib/utils";
+import {
+  getComplaintCustomerName,
+  getPhoneHref,
+  toNumber,
+} from "@/lib/utils";
 import { divIcon, latLngBounds } from "leaflet";
 import { useEffect, useMemo } from "react";
 import {
@@ -16,6 +21,7 @@ const MAP_TONES = {
   base: "#0f172a",
   blue: "#2563eb",
   yellow: "#eab308",
+  green: "#16a34a",
   red: "#ef4444",
   neutral: "#475569",
 };
@@ -66,7 +72,56 @@ function getValidPosition(lat, lon) {
   return [parsedLat, parsedLon];
 }
 
-function AutoFitBounds({ positions = [] }) {
+function resolveStopOrder(stop) {
+  const rawOrder = stop?.order ?? stop?.kolejnosc ?? stop?.sequence ?? null;
+  const parsed = Number(rawOrder);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function resolveStopTone(stop) {
+  if (stop?.tone && MAP_TONES[stop.tone]) {
+    return stop.tone;
+  }
+
+  switch (stop?.status) {
+    case "planned":
+      return "blue";
+    case "in_progress":
+      return "yellow";
+    case "delivered":
+    case "completed":
+      return "green";
+    case "undelivered":
+    case "cancelled":
+      return "red";
+    default:
+      return "neutral";
+  }
+}
+
+function buildFallbackRoutePositions({ basePosition, validStops }) {
+  const orderedStops = validStops
+    .map((stop) => ({
+      ...stop,
+      _resolvedOrder: resolveStopOrder(stop),
+    }))
+    .filter((stop) => stop._resolvedOrder != null)
+    .sort((left, right) => left._resolvedOrder - right._resolvedOrder);
+
+  if (!orderedStops.length) {
+    return [];
+  }
+
+  const positions = orderedStops.map((stop) => stop._position);
+
+  if (!basePosition) {
+    return positions;
+  }
+
+  return [basePosition, ...positions, basePosition];
+}
+
+function AutoFitBounds({ positions = [], singlePointMaxZoom = 9 }) {
   const map = useMap();
   const boundsKey = useMemo(
     () => positions.map(([lat, lon]) => `${lat}:${lon}`).join("|"),
@@ -81,9 +136,9 @@ function AutoFitBounds({ positions = [] }) {
     const bounds = latLngBounds(positions);
     map.fitBounds(bounds, {
       padding: [36, 36],
-      maxZoom: positions.length === 1 ? 9 : 11,
+      maxZoom: positions.length === 1 ? singlePointMaxZoom : 11,
     });
-  }, [boundsKey, map, positions]);
+  }, [boundsKey, map, positions, singlePointMaxZoom]);
 
   return null;
 }
@@ -134,6 +189,7 @@ export default function RouteMap({
   encodedPolyline,
   height = "520px",
   renderStopActions,
+  singlePointMaxZoom = 9,
 }) {
   const validStops = stops
     .map((stop, index) => ({
@@ -149,16 +205,24 @@ export default function RouteMap({
     ...validStops.map((stop) => stop._position),
   ];
   const polyline = buildPolyline(encodedPolyline);
+  const fallbackRoutePositions = buildFallbackRoutePositions({
+    basePosition,
+    validStops,
+  });
+  const routePositions = polyline.length > 0 ? polyline : fallbackRoutePositions;
 
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+    <div className="min-w-0 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
       <MapContainer
         center={center}
         zoom={6}
         style={{ height, width: "100%" }}
         scrollWheelZoom
       >
-        <AutoFitBounds positions={fitPositions} />
+        <AutoFitBounds
+          positions={fitPositions}
+          singlePointMaxZoom={singlePointMaxZoom}
+        />
 
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -180,17 +244,26 @@ export default function RouteMap({
         ) : null}
 
         {validStops.map((stop) => {
+          const customerName = getComplaintCustomerName(
+            stop.reklamacje || stop
+          );
+          const customerPhone =
+            stop.telefon_klienta || stop.reklamacje?.telefon_klienta;
+          const customerPhoneHref = getPhoneHref(customerPhone);
+
           return (
             <Marker
-              key={stop._key}
-              position={stop._position}
-              icon={buildMarkerIcon({
-                tone: stop.tone,
-                selected: stop.selected,
-                label: stop.order ? String(stop.order) : null,
-              })}
-            >
-              <Popup>
+                key={stop._key}
+                position={stop._position}
+                icon={buildMarkerIcon({
+                  tone: resolveStopTone(stop),
+                  selected: stop.selected,
+                  label: resolveStopOrder(stop)
+                    ? String(resolveStopOrder(stop))
+                    : null,
+                })}
+              >
+                <Popup>
                 <div className="space-y-3 text-sm">
                   <div>
                     <div className="font-semibold text-slate-950">
@@ -200,6 +273,21 @@ export default function RouteMap({
                       {stop.miejscowosc || stop.reklamacje?.miejscowosc},{" "}
                       {stop.adres || stop.reklamacje?.adres}
                     </div>
+                    {customerName || customerPhone ? (
+                      <div className="mt-2 space-y-1 text-slate-700">
+                        {customerName ? (
+                          <div className="font-medium">{customerName}</div>
+                        ) : null}
+                        {customerPhone ? (
+                          <a
+                            href={customerPhoneHref || "#"}
+                            className="inline-flex text-sky-700 hover:text-sky-900"
+                          >
+                            {customerPhone}
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   {stop.deadlineLabel ? (
@@ -212,12 +300,7 @@ export default function RouteMap({
                     <StatusBadge value={stop.status || stop.reklamacje?.status} />
                   ) : null}
 
-                  {stop.eta_from ? (
-                    <div className="text-slate-600">
-                      ETA: {formatDate(stop.eta_from, true)}
-                      {stop.eta_to ? ` - ${formatDate(stop.eta_to, true)}` : ""}
-                    </div>
-                  ) : null}
+                  <RouteEtaBadge etaFrom={stop.eta_from} etaTo={stop.eta_to} />
 
                   {stop.zalacznik_pdf || stop.reklamacje?.zalacznik_pdf ? (
                     <a
@@ -239,11 +322,29 @@ export default function RouteMap({
           );
         })}
 
-        {polyline.length > 0 ? (
-          <Polyline
-            positions={polyline}
-            pathOptions={{ color: "#e2e8f0", weight: 4, opacity: 0.9 }}
-          />
+        {routePositions.length > 1 ? (
+          <>
+            <Polyline
+              positions={routePositions}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 10,
+                opacity: 0.9,
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+            />
+            <Polyline
+              positions={routePositions}
+              pathOptions={{
+                color: "#0f172a",
+                weight: 5,
+                opacity: 0.95,
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+            />
+          </>
         ) : null}
       </MapContainer>
     </div>

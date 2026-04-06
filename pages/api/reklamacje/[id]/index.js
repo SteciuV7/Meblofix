@@ -2,8 +2,12 @@ import { REKLAMACJA_STATUS, ROLE } from "@/lib/constants";
 import { requireApiUser } from "@/lib/server/auth";
 import { requireMethod, sendError, sendJson } from "@/lib/server/http";
 import {
+  acceptComplaint,
+  ensureComplaintManualStatusChangeAllowed,
   getReklamacjaDetail,
+  manuallyChangeComplaintStatus,
   transitionComplaintStatus,
+  validateComplaintClosePayload,
 } from "@/lib/server/reklamacje";
 
 function requireAdmin(actor) {
@@ -34,17 +38,13 @@ export default async function handler(req, res) {
     switch (action) {
       case "accept": {
         requireAdmin(actor);
-        const reklamacja = await transitionComplaintStatus({
-          reklamacjaId,
-          actor,
-          nextStatus: REKLAMACJA_STATUS.IN_PROGRESS,
-          action: "reklamacja_accepted",
-        });
+        const reklamacja = await acceptComplaint({ reklamacjaId, actor });
         sendJson(res, 200, { reklamacja });
         return;
       }
       case "request-info": {
         requireAdmin(actor);
+        await ensureComplaintManualStatusChangeAllowed({ reklamacjaId });
         const reklamacja = await transitionComplaintStatus({
           reklamacjaId,
           actor,
@@ -56,6 +56,7 @@ export default async function handler(req, res) {
       }
       case "waiting-delivery": {
         requireAdmin(actor);
+        await ensureComplaintManualStatusChangeAllowed({ reklamacjaId });
         const reklamacja = await transitionComplaintStatus({
           reklamacjaId,
           actor,
@@ -67,30 +68,57 @@ export default async function handler(req, res) {
       }
       case "close": {
         requireAdmin(actor);
+        await ensureComplaintManualStatusChangeAllowed({ reklamacjaId });
+        const closePayload = validateComplaintClosePayload(payload);
         const reklamacja = await transitionComplaintStatus({
           reklamacjaId,
           actor,
           nextStatus: REKLAMACJA_STATUS.DONE,
           action: "reklamacja_closed_manual",
           patch: {
-            ...payload,
+            ...closePayload,
             data_zakonczenia: new Date().toISOString(),
           },
         });
         sendJson(res, 200, { reklamacja });
         return;
       }
+      case "update-close-data": {
+        requireAdmin(actor);
+        const closePayload = validateComplaintClosePayload(payload);
+        const reklamacja = await transitionComplaintStatus({
+          reklamacjaId,
+          actor,
+          action: "reklamacja_close_data_updated",
+          patch: closePayload,
+        });
+        sendJson(res, 200, { reklamacja });
+        return;
+      }
+      case "manual-status-change": {
+        requireAdmin(actor);
+        const reklamacja = await manuallyChangeComplaintStatus({
+          reklamacjaId,
+          actor,
+          nextStatus: payload.status,
+          closePayload: payload.closePayload,
+        });
+        sendJson(res, 200, { reklamacja });
+        return;
+      }
       case "update":
       default: {
+        const nextPayload = { ...payload };
+        delete nextPayload.status;
+
         const reklamacja = await transitionComplaintStatus({
           reklamacjaId,
           actor,
           nextStatus:
-            actor.role === ROLE.ADMIN
-              ? payload.status || undefined
-              : REKLAMACJA_STATUS.UPDATED,
+            actor.role === ROLE.ADMIN ? undefined : REKLAMACJA_STATUS.UPDATED,
           action: "reklamacja_updated",
-          patch: payload,
+          patch: nextPayload,
+          requireCustomerDataValidation: true,
         });
         sendJson(res, 200, { reklamacja });
       }

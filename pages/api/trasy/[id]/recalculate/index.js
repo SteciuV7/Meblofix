@@ -9,12 +9,17 @@ export default async function handler(req, res) {
 
   try {
     const actor = await requireApiUser(req, { adminOnly: true });
-    const { reklamacjeIds = [], planowanyStartAt } = req.body || {};
+    const {
+      reklamacjeIds = [],
+      planowanyStartAt,
+      resetSmsConfirmations = false,
+    } = req.body || {};
     const result = await recalculateRoute({
       routeId: req.query.id,
       reklamacjeIds,
       planowanyStartAt,
       actor,
+      resetSmsConfirmations,
     });
     sendJson(res, 200, result);
   } catch (error) {

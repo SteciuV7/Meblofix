@@ -26,6 +26,11 @@ const adminModules = [
     description: "Widok wszystkich tras z metrykami, statusami i logami.",
   },
   {
+    href: "/ustawienia",
+    title: "Ustawienia",
+    description: "Edycja aktywnej konfiguracji bazy operacyjnej dla planowania tras.",
+  },
+  {
     href: "/trasy/nowa",
     title: "Utwórz trasę",
     description: "Mapa kandydatów, kolejność punktów, ETA i podsumowanie dystansu.",

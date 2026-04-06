@@ -24,6 +24,16 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html,
+#__next {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 table {
   width: 100%;
@@ -223,6 +233,10 @@ th {
 
 .route-pin--red .route-pin__inner {
   background: #ef4444;
+}
+
+.route-pin--green .route-pin__inner {
+  background: #16a34a;
 }
 
 .route-pin--neutral .route-pin__inner {

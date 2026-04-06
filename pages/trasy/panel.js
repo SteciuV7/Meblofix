@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ROLE, ROUTE_STATUS } from "@/lib/constants";
 import { apiFetch } from "@/lib/client-api";
 import { useCurrentProfile } from "@/lib/use-current-profile";
-import { dayKey, formatDate, getRouteDisplayName } from "@/lib/utils";
+import { formatDate, getRouteDisplayName } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
@@ -32,16 +32,16 @@ export default function DriverPanelPage() {
 
     async function load() {
       try {
-        const today = dayKey(new Date());
-        const response = await apiFetch(
-          `/api/trasy?dateFrom=${today}&dateTo=${today}&statuses=${ROUTE_STATUS.PLANNED},${ROUTE_STATUS.IN_PROGRESS}`
+        const visibleStatuses = Object.values(ROUTE_STATUS).filter(
+          (status) => status !== ROUTE_STATUS.COMPLETED
         );
+        const response = await apiFetch(`/api/trasy?statuses=${visibleStatuses.join(",")}`);
 
         if (!active) return;
         setRoutes(response.routes || []);
       } catch (err) {
         if (!active) return;
-        setLoadError(err.message || "Nie udało się pobrać panelu kierowcy.");
+        setLoadError(err.message || "Nie udalo sie pobrac panelu kierowcy.");
       }
     }
 
@@ -54,7 +54,7 @@ export default function DriverPanelPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">
-        Ładowanie...
+        Ladowanie...
       </div>
     );
   }
@@ -67,10 +67,10 @@ export default function DriverPanelPage() {
     <AppShell
       profile={profile}
       title="Panel kierowcy"
-      subtitle="Dzisiejsze trasy gotowe do startu albo już będące w realizacji."
+      subtitle="Widok tras roboczych. Pokazujemy wszystkie trasy poza zakonczonymi."
     >
       {loadError ? (
-        <ScreenState title="Błąd panelu kierowcy" description={loadError} />
+        <ScreenState title="Blad panelu kierowcy" description={loadError} />
       ) : routes.length ? (
         <div className="grid gap-6 xl:grid-cols-2">
           {routes.map((route) => (
@@ -93,10 +93,12 @@ export default function DriverPanelPage() {
               </div>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
-                  href={`/trasy/${route.id}`}
+                  href={`/trasy/panel/${route.id}`}
                   className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
                 >
-                  Otwórz trasę
+                  {route.status === ROUTE_STATUS.PLANNED
+                    ? "Rozpocznij trase"
+                    : "Kontynuuj trase"}
                 </Link>
               </div>
             </div>
@@ -104,8 +106,8 @@ export default function DriverPanelPage() {
         </div>
       ) : (
         <ScreenState
-          title="Brak tras na dziś"
-          description="Gdy pojawią się dzisiejsze trasy w statusie planned lub in_progress, zobaczysz je tutaj."
+          title="Brak aktywnych tras"
+          description="Gdy pojawi sie trasa w statusie innym niz completed, zobaczysz ja tutaj."
         />
       )}
     </AppShell>

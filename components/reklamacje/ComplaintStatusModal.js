@@ -2,6 +2,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import {
   MANUAL_REKLAMACJA_DISABLED_STATUSES,
   REKLAMACJA_STATUS,
+  REKLAMACJA_STATUS_OPTIONS,
 } from "@/lib/constants";
 import { getRouteDisplayName, labelForStatus } from "@/lib/utils";
 import Link from "next/link";
@@ -19,7 +20,7 @@ export default function ComplaintStatusModal({
 
   const activeRouteStop = reklamacja?.activeRouteStop || null;
   const isBlocked = Boolean(activeRouteStop);
-  const statusOptions = useMemo(() => Object.values(REKLAMACJA_STATUS), []);
+  const statusOptions = useMemo(() => REKLAMACJA_STATUS_OPTIONS, []);
 
   useEffect(() => {
     if (!isOpen || !reklamacja) {

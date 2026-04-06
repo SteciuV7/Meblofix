@@ -48,7 +48,7 @@ export function ReklamacjeTable({
             <tr>
               <th className="px-4 py-3 font-medium">Nr</th>
               {showFirma ? <th className="px-4 py-3 font-medium">Firma</th> : null}
-              <th className="px-4 py-3 font-medium">Faktura</th>
+              <th className="px-4 py-3 font-medium">Numer reklamacji</th>
               <th className="px-4 py-3 font-medium">Imie</th>
               <th className="px-4 py-3 font-medium">Nazwisko</th>
               <th className="px-4 py-3 font-medium">Telefon</th>

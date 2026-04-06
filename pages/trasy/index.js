@@ -10,6 +10,7 @@ import {
   formatDuration,
   getRouteDisplayName,
 } from "@/lib/utils";
+import { CirclePlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
@@ -49,9 +50,10 @@ export default function RoutesListPage() {
         const response = await apiFetch(`/api/trasy?${query.toString()}`);
         if (!active) return;
         setRoutes(response.routes || []);
+        setLoadError(null);
       } catch (err) {
         if (!active) return;
-        setLoadError(err.message || "Nie udało się pobrać tras.");
+        setLoadError(err.message || "Nie udalo sie pobrac tras.");
       }
     }
 
@@ -64,7 +66,7 @@ export default function RoutesListPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">
-        Ładowanie...
+        Ladowanie...
       </div>
     );
   }
@@ -77,13 +79,14 @@ export default function RoutesListPage() {
     <AppShell
       profile={profile}
       title="Lista tras"
-      subtitle="Centralny widok zaplanowanych, rozpoczętych i ukończonych tras."
+      subtitle="Centralny widok zaplanowanych, rozpoczetych i ukonczonych tras."
       actions={
         <Link
           href="/trasy/nowa"
-          className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-500"
         >
-          Utwórz trasę
+          <CirclePlus className="h-4 w-4" />
+          Utworz trase
         </Link>
       }
       fullWidth
@@ -143,7 +146,7 @@ export default function RoutesListPage() {
 
       <section className="mt-8">
         {loadError ? (
-          <ScreenState title="Błąd ładowania tras" description={loadError} />
+          <ScreenState title="Blad ladowania tras" description={loadError} />
         ) : routes.length ? (
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
@@ -166,9 +169,13 @@ export default function RoutesListPage() {
                         <div className="font-semibold text-slate-900">
                           {getRouteDisplayName(route)}
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">{route.numer}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {route.numer}
+                        </div>
                       </td>
-                      <td className="px-4 py-4 text-slate-700">{formatDate(route.data_trasy)}</td>
+                      <td className="px-4 py-4 text-slate-700">
+                        {formatDate(route.data_trasy)}
+                      </td>
                       <td className="px-4 py-4 text-slate-700">
                         {formatDate(route.planowany_start_at, true)}
                       </td>
@@ -186,7 +193,7 @@ export default function RoutesListPage() {
                           href={`/trasy/${route.id}`}
                           className="rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
                         >
-                          Szczegóły
+                          Szczegoly
                         </Link>
                       </td>
                     </tr>
@@ -198,7 +205,7 @@ export default function RoutesListPage() {
         ) : (
           <ScreenState
             title="Brak tras"
-            description="Po utworzeniu pierwszej trasy zobaczysz ją właśnie tutaj."
+            description="Po utworzeniu pierwszej trasy zobaczysz ja wlasnie tutaj."
           />
         )}
       </section>

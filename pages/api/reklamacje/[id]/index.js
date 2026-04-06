@@ -6,6 +6,7 @@ import {
   ensureComplaintManualStatusChangeAllowed,
   getReklamacjaDetail,
   manuallyChangeComplaintStatus,
+  setComplaintPickedUp,
   transitionComplaintStatus,
   validateComplaintClosePayload,
 } from "@/lib/server/reklamacje";
@@ -38,19 +39,7 @@ export default async function handler(req, res) {
     switch (action) {
       case "accept": {
         requireAdmin(actor);
-        const reklamacja = await acceptComplaint({ reklamacjaId, actor });
-        sendJson(res, 200, { reklamacja });
-        return;
-      }
-      case "request-info": {
-        requireAdmin(actor);
-        await ensureComplaintManualStatusChangeAllowed({ reklamacjaId });
-        const reklamacja = await transitionComplaintStatus({
-          reklamacjaId,
-          actor,
-          nextStatus: REKLAMACJA_STATUS.WAITING_INFO,
-          action: "reklamacja_waiting_info",
-        });
+        const reklamacja = await acceptComplaint({ reklamacjaId, actor, payload });
         sendJson(res, 200, { reklamacja });
         return;
       }
@@ -102,6 +91,16 @@ export default async function handler(req, res) {
           actor,
           nextStatus: payload.status,
           closePayload: payload.closePayload,
+        });
+        sendJson(res, 200, { reklamacja });
+        return;
+      }
+      case "set-element-odebrany": {
+        requireAdmin(actor);
+        const reklamacja = await setComplaintPickedUp({
+          reklamacjaId,
+          actor,
+          elementOdebrany: payload.element_odebrany,
         });
         sendJson(res, 200, { reklamacja });
         return;

@@ -1,7 +1,10 @@
+import PickedUpIndicator from "@/components/PickedUpIndicator";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RouteEtaBadge } from "@/components/trasy/RouteTiming";
+import { REKLAMACJA_STATUS } from "@/lib/constants";
 import { getPublicStorageUrl } from "@/lib/storage";
 import {
+  formatDate,
   getComplaintCustomerName,
   getPhoneHref,
   toNumber,
@@ -20,9 +23,13 @@ import {
 const MAP_TONES = {
   base: "#0f172a",
   blue: "#2563eb",
+  indigo: "#6366f1",
   yellow: "#eab308",
+  orange: "#f97316",
   green: "#16a34a",
   red: "#ef4444",
+  violet: "#8b5cf6",
+  fuchsia: "#d946ef",
   neutral: "#475569",
 };
 
@@ -81,6 +88,25 @@ function resolveStopOrder(stop) {
 function resolveStopTone(stop) {
   if (stop?.tone && MAP_TONES[stop.tone]) {
     return stop.tone;
+  }
+
+  const complaintStatus = stop?.status || stop?.reklamacje?.status;
+
+  switch (complaintStatus) {
+    case REKLAMACJA_STATUS.NEW:
+      return "yellow";
+    case REKLAMACJA_STATUS.UPDATED:
+      return "orange";
+    case REKLAMACJA_STATUS.IN_PROGRESS:
+      return "red";
+    case REKLAMACJA_STATUS.WAITING_DELIVERY:
+      return "fuchsia";
+    case REKLAMACJA_STATUS.ROUTE_PLANNED:
+      return "indigo";
+    case REKLAMACJA_STATUS.ON_ROUTE:
+      return "violet";
+    default:
+      break;
   }
 
   switch (stop?.status) {
@@ -188,6 +214,9 @@ export default function RouteMap({
   stops = [],
   encodedPolyline,
   height = "520px",
+  className = "",
+  onShowStopDetails,
+  popupVariant = "default",
   renderStopActions,
   singlePointMaxZoom = 9,
 }) {
@@ -210,9 +239,13 @@ export default function RouteMap({
     validStops,
   });
   const routePositions = polyline.length > 0 ? polyline : fallbackRoutePositions;
+  const isComplaintPopup =
+    popupVariant === "complaint-candidate" || popupVariant === "complaint-map";
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+    <div
+      className={`min-w-0 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm ${className}`}
+    >
       <MapContainer
         center={center}
         zoom={6}
@@ -244,79 +277,198 @@ export default function RouteMap({
         ) : null}
 
         {validStops.map((stop) => {
-          const customerName = getComplaintCustomerName(
-            stop.reklamacje || stop
-          );
+          const complaint = stop.reklamacje || stop;
+          const customerName = getComplaintCustomerName(complaint);
           const customerPhone =
-            stop.telefon_klienta || stop.reklamacje?.telefon_klienta;
+            stop.telefon_klienta || complaint?.telefon_klienta;
           const customerPhoneHref = getPhoneHref(customerPhone);
+          const isElementPickedUp = Boolean(
+            stop.element_odebrany ?? complaint?.element_odebrany
+          );
+          const complaintStatus = isComplaintPopup
+            ? complaint?.status
+            : stop.status || complaint?.status;
+          const companyName = stop.nazwa_firmy || complaint?.nazwa_firmy || "-";
+          const addressLabel = [
+            complaint?.kod_pocztowy || stop.kod_pocztowy,
+            complaint?.miejscowosc || stop.miejscowosc,
+            complaint?.adres || stop.adres,
+          ]
+            .filter(Boolean)
+            .join(" ");
+          const complaintNumber =
+            complaint?.numer_faktury || complaint?.nr_reklamacji || "-";
+          const description = complaint?.opis?.trim() || "-";
 
           return (
             <Marker
-                key={stop._key}
-                position={stop._position}
-                icon={buildMarkerIcon({
-                  tone: resolveStopTone(stop),
-                  selected: stop.selected,
-                  label: resolveStopOrder(stop)
-                    ? String(resolveStopOrder(stop))
-                    : null,
-                })}
-              >
-                <Popup>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <div className="font-semibold text-slate-950">
-                      {stop.nazwa_firmy || stop.reklamacje?.nazwa_firmy}
+              key={stop._key}
+              position={stop._position}
+              icon={buildMarkerIcon({
+                tone: resolveStopTone(stop),
+                selected: stop.selected,
+                label: resolveStopOrder(stop)
+                  ? String(resolveStopOrder(stop))
+                  : null,
+              })}
+            >
+              <Popup>
+                {isComplaintPopup ? (
+                  <div className="w-[320px] max-w-[80vw] space-y-3 text-sm">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Firma
+                      </div>
+                      <div className="mt-1 font-semibold text-slate-950">
+                        {companyName}
+                      </div>
                     </div>
-                    <div className="mt-1 text-slate-600">
-                      {stop.miejscowosc || stop.reklamacje?.miejscowosc},{" "}
-                      {stop.adres || stop.reklamacje?.adres}
+
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Status przesylki
+                      </div>
+                      <div className="mt-2">
+                        {complaintStatus ? (
+                          <StatusBadge value={complaintStatus} />
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </div>
                     </div>
-                    {customerName || customerPhone ? (
-                      <div className="mt-2 space-y-1 text-slate-700">
-                        {customerName ? (
-                          <div className="font-medium">{customerName}</div>
-                        ) : null}
-                        {customerPhone ? (
-                          <a
-                            href={customerPhoneHref || "#"}
-                            className="inline-flex text-sky-700 hover:text-sky-900"
+
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Adres
+                      </div>
+                      <div className="mt-1 text-slate-700">
+                        {addressLabel || "-"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Termin realizacji
+                      </div>
+                      <div className="mt-1 text-slate-700">
+                        {formatDate(complaint?.realizacja_do)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Numer reklamacji
+                      </div>
+                      <div className="mt-1 text-slate-700">
+                        {complaintNumber}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Opis
+                      </div>
+                      <div className="mt-1 whitespace-pre-wrap text-slate-700">
+                        {description}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Element odebrany
+                      </div>
+                      <div className="mt-2">
+                        <PickedUpIndicator
+                          checked={isElementPickedUp}
+                          label={
+                            isElementPickedUp
+                              ? "Element odebrany"
+                              : "Element nieodebrany"
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {(onShowStopDetails || renderStopActions) ? (
+                      <div
+                        className={`grid gap-2 ${
+                          onShowStopDetails && renderStopActions
+                            ? "sm:grid-cols-2"
+                            : ""
+                        }`}
+                      >
+                        {onShowStopDetails ? (
+                          <button
+                            type="button"
+                            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                            onClick={() => onShowStopDetails(stop)}
                           >
-                            {customerPhone}
-                          </a>
+                            Szczegoly
+                          </button>
                         ) : null}
+                        {renderStopActions ? renderStopActions(stop) : null}
                       </div>
                     ) : null}
                   </div>
-
-                  {stop.deadlineLabel ? (
-                    <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                      {stop.deadlineLabel}
+                ) : (
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="font-semibold text-slate-950">
+                        {companyName}
+                      </div>
+                      <div className="mt-1 text-slate-600">
+                        {stop.miejscowosc || complaint?.miejscowosc},{" "}
+                        {stop.adres || complaint?.adres}
+                      </div>
+                      {customerName || customerPhone ? (
+                        <div className="mt-2 space-y-1 text-slate-700">
+                          {customerName ? (
+                            <div className="font-medium">{customerName}</div>
+                          ) : null}
+                          {customerPhone ? (
+                            <a
+                              href={customerPhoneHref || "#"}
+                              className="inline-flex text-sky-700 hover:text-sky-900"
+                            >
+                              {customerPhone}
+                            </a>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
 
-                  {stop.status || stop.reklamacje?.status ? (
-                    <StatusBadge value={stop.status || stop.reklamacje?.status} />
-                  ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      {complaintStatus ? (
+                        <StatusBadge value={complaintStatus} />
+                      ) : null}
+                      <PickedUpIndicator
+                        checked={isElementPickedUp}
+                        label={
+                          isElementPickedUp
+                            ? "Element odebrany"
+                            : "Element nieodebrany"
+                        }
+                      />
+                    </div>
 
-                  <RouteEtaBadge etaFrom={stop.eta_from} etaTo={stop.eta_to} />
+                    <RouteEtaBadge etaFrom={stop.eta_from} etaTo={stop.eta_to} />
 
-                  {stop.zalacznik_pdf || stop.reklamacje?.zalacznik_pdf ? (
-                    <a
-                      href={getPublicStorageUrl(
-                        stop.zalacznik_pdf || stop.reklamacje?.zalacznik_pdf
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block text-sky-700"
-                    >
-                      PDF
-                    </a>
-                  ) : null}
+                    {stop.zalacznik_pdf || complaint?.zalacznik_pdf ? (
+                      <a
+                        href={getPublicStorageUrl(
+                          stop.zalacznik_pdf || complaint?.zalacznik_pdf
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-sky-700"
+                      >
+                        PDF
+                      </a>
+                    ) : null}
 
-                  {renderStopActions ? <div>{renderStopActions(stop)}</div> : null}
-                </div>
+                    {renderStopActions ? <div>{renderStopActions(stop)}</div> : null}
+                  </div>
+                )}
               </Popup>
             </Marker>
           );

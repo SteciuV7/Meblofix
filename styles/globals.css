@@ -223,6 +223,10 @@ th {
   background: #2563eb;
 }
 
+.route-pin--indigo .route-pin__inner {
+  background: #6366f1;
+}
+
 .route-pin--yellow .route-pin__inner {
   background: #eab308;
 }
@@ -231,12 +235,24 @@ th {
   color: #0f172a;
 }
 
+.route-pin--orange .route-pin__inner {
+  background: #f97316;
+}
+
 .route-pin--red .route-pin__inner {
   background: #ef4444;
 }
 
+.route-pin--violet .route-pin__inner {
+  background: #8b5cf6;
+}
+
 .route-pin--green .route-pin__inner {
   background: #16a34a;
+}
+
+.route-pin--fuchsia .route-pin__inner {
+  background: #d946ef;
 }
 
 .route-pin--neutral .route-pin__inner {

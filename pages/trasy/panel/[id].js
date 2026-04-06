@@ -332,7 +332,7 @@ export default function DriverRoutePage() {
                       </div>
                       <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700">
                         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Nr faktury
+                          Numer reklamacji
                         </div>
                         <div className="mt-2 font-semibold text-slate-950">
                           {nextComplaint.numer_faktury || "-"}

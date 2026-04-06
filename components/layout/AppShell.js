@@ -10,15 +10,15 @@ import { useEffect, useState } from "react";
 const baseLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/reklamacje", label: "Reklamacje" },
+  { href: "/mapa", label: "Mapa" },
   { href: "/archiwum", label: "Archiwum" },
 ];
 
 const adminLinks = [
   { href: "/trasy", label: "Trasy" },
   { href: "/ustawienia", label: "Ustawienia" },
-  { href: "/trasy/nowa", label: "Utwórz trasę" },
   { href: "/trasy/panel", label: "Panel kierowcy" },
-  { href: "/uzytkownicy", label: "Użytkownicy" },
+  { href: "/uzytkownicy", label: "Uzytkownicy" },
 ];
 
 function isLinkActive(pathname, href) {
@@ -75,7 +75,7 @@ export function AppShell({
                 type="button"
                 className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 lg:hidden"
                 onClick={() => setMobileNavOpen((current) => !current)}
-                aria-label={mobileNavOpen ? "Zamknij menu" : "Otwórz menu"}
+                aria-label={mobileNavOpen ? "Zamknij menu" : "Otworz menu"}
                 aria-expanded={mobileNavOpen}
               >
                 {mobileNavOpen ? (
@@ -113,7 +113,7 @@ export function AppShell({
                         router.push("/login");
                       }}
                     >
-                      Wyloguj się
+                      Wyloguj sie
                     </button>
                   </div>
                 )}

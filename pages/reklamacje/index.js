@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { ScreenState } from "@/components/layout/ScreenState";
+import ComplaintAcceptModal from "@/components/reklamacje/ComplaintAcceptModal";
 import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
 import ComplaintStatusModal from "@/components/reklamacje/ComplaintStatusModal";
 import { ReklamacjeTable } from "@/components/reklamacje/ReklamacjeTable";
@@ -7,6 +8,7 @@ import { apiFetch } from "@/lib/client-api";
 import {
   ACCEPTABLE_REKLAMACJA_STATUSES,
   REKLAMACJA_STATUS,
+  REKLAMACJA_STATUS_OPTIONS,
   ROLE,
 } from "@/lib/constants";
 import { useCurrentProfile } from "@/lib/use-current-profile";
@@ -52,6 +54,7 @@ export default function ReklamacjeIndexPage() {
   const [terminOd, setTerminOd] = useState("");
   const [terminDo, setTerminDo] = useState("");
   const [loadError, setLoadError] = useState(null);
+  const [acceptModalComplaint, setAcceptModalComplaint] = useState(null);
   const [acceptingComplaintId, setAcceptingComplaintId] = useState(null);
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusModalComplaint, setStatusModalComplaint] = useState(null);
@@ -111,18 +114,28 @@ export default function ReklamacjeIndexPage() {
   }
 
   async function handleAcceptComplaint(reklamacja) {
-    setAcceptingComplaintId(reklamacja.id);
+    setAcceptModalComplaint(reklamacja);
+  }
+
+  async function handleAcceptSubmit(payload) {
+    if (!acceptModalComplaint) {
+      return;
+    }
+
+    setAcceptingComplaintId(acceptModalComplaint.id);
 
     try {
-      await apiFetch(`/api/reklamacje/${reklamacja.id}`, {
+      await apiFetch(`/api/reklamacje/${acceptModalComplaint.id}`, {
         method: "PATCH",
         body: JSON.stringify({
           action: "accept",
+          payload,
         }),
       });
       await refreshReklamacje();
+      setAcceptModalComplaint(null);
     } catch (error) {
-      alert(error.message || "Nie udalo sie przyjac reklamacji.");
+      throw error;
     } finally {
       setAcceptingComplaintId(null);
     }
@@ -342,7 +355,7 @@ export default function ReklamacjeIndexPage() {
                   className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-[13px] outline-none transition focus:border-slate-400"
                 >
                   <option value="">Wszystkie statusy</option>
-                  {Object.values(REKLAMACJA_STATUS).map((item) => (
+                  {REKLAMACJA_STATUS_OPTIONS.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
@@ -436,6 +449,18 @@ export default function ReklamacjeIndexPage() {
           }
         }}
         onSubmit={handleStatusSubmit}
+      />
+
+      <ComplaintAcceptModal
+        isOpen={Boolean(acceptModalComplaint)}
+        reklamacja={acceptModalComplaint}
+        loading={Boolean(acceptModalComplaint && acceptingComplaintId)}
+        onClose={() => {
+          if (!acceptingComplaintId) {
+            setAcceptModalComplaint(null);
+          }
+        }}
+        onSubmit={handleAcceptSubmit}
       />
 
       <ComplaintCloseModal

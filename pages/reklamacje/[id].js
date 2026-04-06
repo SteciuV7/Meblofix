@@ -1,7 +1,11 @@
 import { AppShell } from "@/components/layout/AppShell";
+import PickedUpIndicator from "@/components/PickedUpIndicator";
 import { ScreenState } from "@/components/layout/ScreenState";
 import { StatusBadge } from "@/components/StatusBadge";
+import ComplaintAcceptModal from "@/components/reklamacje/ComplaintAcceptModal";
 import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
+import ImagePreviewModal from "@/components/reklamacje/ImagePreviewModal";
+import StoredImageTile from "@/components/reklamacje/StoredImageTile";
 import { storagePathToFileName } from "@/components/reklamacje/AttachmentDropzone";
 import {
   ACCEPTABLE_REKLAMACJA_STATUSES,
@@ -22,7 +26,6 @@ import {
   labelForOperationalAction,
   safeArray,
 } from "@/lib/utils";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
@@ -67,35 +70,6 @@ function DetailCard({ actions, children, title }) {
   );
 }
 
-function CompletionImageTile({ path }) {
-  const url = getPublicStorageUrl(path);
-
-  if (!url) {
-    return null;
-  }
-
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50 shadow-sm transition hover:border-slate-300"
-    >
-      <Image
-        src={url}
-        alt={storagePathToFileName(path, "Zdjecie zakonczenia")}
-        width={1200}
-        height={900}
-        unoptimized
-        className="h-44 w-full object-cover"
-      />
-      <div className="border-t border-slate-200 px-4 py-3 text-sm font-medium text-slate-700">
-        {storagePathToFileName(path, "Zdjecie zakonczenia")}
-      </div>
-    </a>
-  );
-}
-
 export default function ReklamacjaDetailPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -106,7 +80,9 @@ export default function ReklamacjaDetailPage() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [acknowledge, setAcknowledge] = useState(false);
+  const [acceptModalOpen, setAcceptModalOpen] = useState(false);
   const [closeModalMode, setCloseModalMode] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     if (error) {
@@ -159,6 +135,16 @@ export default function ReklamacjaDetailPage() {
     profile?.role === ROLE.ADMIN &&
     ACCEPTABLE_REKLAMACJA_STATUSES.includes(detail?.reklamacja?.status) &&
     !manualStatusChangeBlocked;
+  const isElementPickedUp = Boolean(detail?.reklamacja?.element_odebrany);
+  const complaintDisplayNumber =
+    detail?.reklamacja?.numer_faktury ||
+    detail?.reklamacja?.nr_reklamacji ||
+    "-";
+  const showAdminSections = profile?.role === ROLE.ADMIN;
+  const showAcknowledgeSection =
+    profile?.role !== ROLE.ADMIN &&
+    detail?.reklamacja?.nieprzeczytane_dla_uzytkownika;
+  const hasAsideContent = showAdminSections || showAcknowledgeSection;
 
   async function refresh() {
     const response = await apiFetch(`/api/reklamacje/${id}`);
@@ -243,6 +229,20 @@ export default function ReklamacjaDetailPage() {
     }
   }
 
+  async function handleAcceptSubmit(payload) {
+    const success = await update("accept", payload);
+
+    if (success) {
+      setAcceptModalOpen(false);
+    }
+  }
+
+  async function handleTogglePickedUp() {
+    await update("set-element-odebrany", {
+      element_odebrany: !isElementPickedUp,
+    });
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">
@@ -259,7 +259,7 @@ export default function ReklamacjaDetailPage() {
     <>
       <AppShell
         profile={profile}
-        title={`Reklamacja ${detail?.reklamacja?.nr_reklamacji || ""}`}
+        title={`Reklamacja ${complaintDisplayNumber !== "-" ? complaintDisplayNumber : ""}`}
         subtitle="Pelny szczegol zgloszenia z historia zmian, informacja o trasie i danymi zakonczenia."
         actions={
           <div className="flex flex-wrap gap-3">
@@ -269,6 +269,16 @@ export default function ReklamacjaDetailPage() {
             >
               Wroc do listy
             </Link>
+            {canAcceptCurrentComplaint ? (
+              <button
+                type="button"
+                onClick={() => setAcceptModalOpen(true)}
+                disabled={saving}
+                className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Przyjmij
+              </button>
+            ) : null}
             {detail ? (
               <button
                 type="button"
@@ -294,11 +304,17 @@ export default function ReklamacjaDetailPage() {
             description="Pobieram reklamacje i historie logow."
           />
         ) : (
-          <div className="grid gap-8 xl:grid-cols-[minmax(0,1.15fr),420px]">
+          <div
+            className={
+              hasAsideContent
+                ? "grid gap-8 xl:grid-cols-[minmax(0,1.15fr),420px]"
+                : "grid gap-8"
+            }
+          >
             <section className="space-y-8">
               <DetailCard title="Dane reklamacji">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-[220px]">
                     <div className="text-sm text-slate-500">
                       {detail.reklamacja.nazwa_firmy}
                     </div>
@@ -314,10 +330,40 @@ export default function ReklamacjaDetailPage() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    <div>Dodano: {formatDate(detail.reklamacja.data_zgloszenia, true)}</div>
-                    <div className="mt-1">
-                      Termin: {formatDate(detail.reklamacja.realizacja_do, true)}
+                  <div className="min-w-[260px] flex-1 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Numer reklamacji
+                    </div>
+                    <div className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+                      {complaintDisplayNumber}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      <div>Dodano: {formatDate(detail.reklamacja.data_zgloszenia, true)}</div>
+                      <div className="mt-1">
+                        Termin: {formatDate(detail.reklamacja.realizacja_do, true)}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Element odebrany
+                      </div>
+                      <div className="mt-2">
+                        <PickedUpIndicator checked={isElementPickedUp} />
+                      </div>
+                      {profile.role === ROLE.ADMIN ? (
+                        <button
+                          type="button"
+                          onClick={handleTogglePickedUp}
+                          disabled={saving}
+                          className="mt-3 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isElementPickedUp
+                            ? "Cofnij oznaczenie"
+                            : "Oznacz jako odebrany"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -362,6 +408,17 @@ export default function ReklamacjaDetailPage() {
                         : ""}
                       {detail.reklamacja.adres || "—"}
                     </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-700">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Informacje od Meblofix
+                  </div>
+                  <div className="mt-3 whitespace-pre-wrap text-slate-800">
+                    {detail.reklamacja.informacje?.trim()
+                      ? detail.reklamacja.informacje
+                      : "Brak informacji od Meblofix."}
                   </div>
                 </div>
 
@@ -536,28 +593,6 @@ export default function ReklamacjaDetailPage() {
                     >
                       {saving ? "Zapisywanie..." : "Zapisz zmiany"}
                     </button>
-                    {profile.role === ROLE.ADMIN && !complaintClosed ? (
-                      <>
-                        {canAcceptCurrentComplaint ? (
-                          <button
-                            type="button"
-                            className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                            onClick={() => update("accept")}
-                            disabled={saving || manualStatusChangeBlocked}
-                          >
-                            Przyjmij
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="rounded-full bg-amber-500 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={() => update("request-info")}
-                          disabled={saving || manualStatusChangeBlocked}
-                        >
-                          Oczekuje na informacje
-                        </button>
-                      </>
-                    ) : null}
                   </div>
                 ) : null}
 
@@ -579,28 +614,40 @@ export default function ReklamacjaDetailPage() {
               </DetailCard>
 
               <DetailCard title="Zalaczniki zgloszenia">
-                <div className="flex flex-wrap gap-3">
+                <div className="space-y-6">
                   {detail.reklamacja.zalacznik_pdf ? (
-                    <a
-                      href={getPublicStorageUrl(detail.reklamacja.zalacznik_pdf)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-                    >
-                      Otworz PDF
-                    </a>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800">PDF zgloszenia</div>
+                      <div className="mt-3">
+                        <a
+                          href={getPublicStorageUrl(detail.reklamacja.zalacznik_pdf)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                        >
+                          Otworz PDF
+                        </a>
+                      </div>
+                    </div>
                   ) : null}
-                  {images.map((image) => (
-                    <a
-                      key={image}
-                      href={getPublicStorageUrl(image)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-                    >
-                      {storagePathToFileName(image, "Zdjecie")}
-                    </a>
-                  ))}
+                  {images.length ? (
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        Zdjecia zgloszenia
+                      </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {images.map((image) => (
+                          <StoredImageTile
+                            key={image}
+                            path={image}
+                            fallbackName="Zdjecie"
+                            imageClassName="h-44"
+                            onClick={setPreviewImage}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {!detail.reklamacja.zalacznik_pdf && !images.length ? (
                     <div className="text-slate-400">
                       Brak zalacznikow do zgloszenia.
@@ -680,7 +727,13 @@ export default function ReklamacjaDetailPage() {
                         </div>
                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                           {completionImages.map((path) => (
-                            <CompletionImageTile key={path} path={path} />
+                            <StoredImageTile
+                              key={path}
+                              path={path}
+                              fallbackName="Zdjecie zakonczenia"
+                              imageClassName="h-44"
+                              onClick={setPreviewImage}
+                            />
                           ))}
                         </div>
                       </div>
@@ -702,85 +755,91 @@ export default function ReklamacjaDetailPage() {
                 ) : null}
               </DetailCard>
 
-              <DetailCard title="Historia dzialan">
-                {detail.logs.length ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="text-left text-slate-500">
-                        <tr>
-                          <th className="px-3 py-2">Data</th>
-                          <th className="px-3 py-2">Akcja</th>
-                          <th className="px-3 py-2">Kto</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.logs.map((log) => (
-                          <tr key={log.id} className="border-t border-slate-200">
-                            <td className="px-3 py-3">
-                              {formatDate(log.created_at, true)}
-                            </td>
-                            <td className="px-3 py-3">
-                              {labelForOperationalAction(log.action)}
-                            </td>
-                            <td className="px-3 py-3">
-                              {log.actor_email || "system"}
-                              {log.actor_role ? (
-                                <span className="ml-2 text-xs text-slate-500">
-                                  ({log.actor_role})
-                                </span>
-                              ) : null}
-                            </td>
+              {showAdminSections ? (
+                <DetailCard title="Historia dzialan">
+                  {detail.logs.length ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="text-left text-slate-500">
+                          <tr>
+                            <th className="px-3 py-2">Data</th>
+                            <th className="px-3 py-2">Akcja</th>
+                            <th className="px-3 py-2">Kto</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-slate-500">Brak logow dla tej reklamacji.</p>
-                )}
-              </DetailCard>
+                        </thead>
+                        <tbody>
+                          {detail.logs.map((log) => (
+                            <tr key={log.id} className="border-t border-slate-200">
+                              <td className="px-3 py-3">
+                                {formatDate(log.created_at, true)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {labelForOperationalAction(log.action)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {log.actor_email || "system"}
+                                {log.actor_role ? (
+                                  <span className="ml-2 text-xs text-slate-500">
+                                    ({log.actor_role})
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-slate-500">Brak logow dla tej reklamacji.</p>
+                  )}
+                </DetailCard>
+              ) : null}
             </section>
 
-            <aside className="space-y-8">
-              <DetailCard title="Powiazana trasa">
-                {detail.routeStop?.trasy ? (
-                  <div className="space-y-3 text-sm text-slate-700">
-                    <div>
-                      Nazwa: {detail.routeStop.trasy.nazwa || "Brak nazwy wlasnej"}
-                    </div>
-                    <div>
-                      Numer:{" "}
-                      <Link
-                        href={`/trasy/${detail.routeStop.trasy.id}`}
-                        className="font-semibold text-indigo-700 hover:text-indigo-900"
-                      >
-                        {detail.routeStop.trasy.numer}
-                      </Link>
-                    </div>
-                    <div>
-                      Status trasy: <StatusBadge value={detail.routeStop.trasy.status} />
-                    </div>
-                    <div>Kolejnosc punktu: {detail.routeStop.kolejnosc}</div>
-                    <div>ETA od: {formatEtaDate(detail.routeStop.eta_from)}</div>
-                    <div>ETA do: {formatEtaDate(detail.routeStop.eta_to)}</div>
-                    <div>
-                      Dystans od poprzedniego:{" "}
-                      {formatDistance(detail.routeStop.distance_from_prev_m)}
-                    </div>
-                    <div>
-                      Czas od poprzedniego:{" "}
-                      {formatDuration(detail.routeStop.duration_from_prev_s)}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-slate-500">
-                    Ta reklamacja nie jest obecnie przypisana do aktywnej trasy.
-                  </p>
-                )}
-              </DetailCard>
+            {hasAsideContent ? (
+              <aside className="space-y-8">
+                {showAdminSections ? (
+                  <>
+                    <DetailCard title="Powiazana trasa">
+                      {detail.routeStop?.trasy ? (
+                        <div className="space-y-3 text-sm text-slate-700">
+                          <div>
+                            Nazwa: {detail.routeStop.trasy.nazwa || "Brak nazwy wlasnej"}
+                          </div>
+                          <div>
+                            Numer:{" "}
+                            <Link
+                              href={`/trasy/${detail.routeStop.trasy.id}`}
+                              className="font-semibold text-indigo-700 hover:text-indigo-900"
+                            >
+                              {detail.routeStop.trasy.numer}
+                            </Link>
+                          </div>
+                          <div>
+                            Status trasy: <StatusBadge value={detail.routeStop.trasy.status} />
+                          </div>
+                          <div>Kolejnosc punktu: {detail.routeStop.kolejnosc}</div>
+                          <div>ETA od: {formatEtaDate(detail.routeStop.eta_from)}</div>
+                          <div>ETA do: {formatEtaDate(detail.routeStop.eta_to)}</div>
+                          <div>
+                            Dystans od poprzedniego:{" "}
+                            {formatDistance(detail.routeStop.distance_from_prev_m)}
+                          </div>
+                          <div>
+                            Czas od poprzedniego:{" "}
+                            {formatDuration(detail.routeStop.duration_from_prev_s)}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-slate-500">
+                          Ta reklamacja nie jest obecnie przypisana do aktywnej trasy.
+                        </p>
+                      )}
+                    </DetailCard>
+                  </>
+                ) : null}
 
-              {profile.role !== ROLE.ADMIN &&
-              detail.reklamacja.nieprzeczytane_dla_uzytkownika ? (
+                {showAcknowledgeSection ? (
                 <DetailCard title="Potwierdzenie zapoznania">
                   <label className="flex items-start gap-3 text-sm text-slate-700">
                     <input
@@ -802,8 +861,9 @@ export default function ReklamacjaDetailPage() {
                     Potwierdz odczyt
                   </button>
                 </DetailCard>
-              ) : null}
-            </aside>
+                ) : null}
+              </aside>
+            ) : null}
           </div>
         )}
       </AppShell>
@@ -824,6 +884,23 @@ export default function ReklamacjaDetailPage() {
           }
         }}
         onSubmit={handleCloseSubmit}
+      />
+
+      <ComplaintAcceptModal
+        isOpen={acceptModalOpen}
+        reklamacja={detail?.reklamacja || null}
+        loading={saving}
+        onClose={() => {
+          if (!saving) {
+            setAcceptModalOpen(false);
+          }
+        }}
+        onSubmit={handleAcceptSubmit}
+      />
+
+      <ImagePreviewModal
+        image={previewImage}
+        onClose={() => setPreviewImage(null)}
       />
     </>
   );

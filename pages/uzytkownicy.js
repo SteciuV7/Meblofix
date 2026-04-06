@@ -210,6 +210,7 @@ export default function Users() {
         },
         body: JSON.stringify({
           userId: userToEdit.firma_id,
+          currentEmail: userToEdit.email,
           email: newEmail,
           password: newPassword,
         }),

@@ -1,12 +1,14 @@
 import dynamic from "next/dynamic";
+import PickedUpIndicator from "@/components/PickedUpIndicator";
 import { AppShell } from "@/components/layout/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
+import ComplaintPreviewModal from "@/components/reklamacje/ComplaintPreviewModal";
 import {
   RouteBaseCard,
   RouteEtaBadge,
   RouteLegConnector,
 } from "@/components/trasy/RouteTiming";
-import { ROLE } from "@/lib/constants";
+import { REKLAMACJA_STATUS, ROLE } from "@/lib/constants";
 import { apiFetch } from "@/lib/client-api";
 import { useCurrentProfile } from "@/lib/use-current-profile";
 import {
@@ -26,24 +28,26 @@ const RouteMap = dynamic(() => import("@/components/maps/RouteMap"), {
   ssr: false,
 });
 
-const DEADLINE_THEMES = {
-  blue: {
-    card: "border-sky-200 bg-sky-50",
-    accent: "bg-sky-400",
-    badge: "border border-sky-200 bg-sky-100 text-sky-800",
-    marker: "blue",
-  },
-  yellow: {
+const CANDIDATE_STATUS_THEMES = {
+  [REKLAMACJA_STATUS.NEW]: {
     card: "border-amber-200 bg-amber-50",
     accent: "bg-amber-400",
-    badge: "border border-amber-200 bg-amber-100 text-amber-800",
     marker: "yellow",
   },
-  red: {
+  [REKLAMACJA_STATUS.UPDATED]: {
+    card: "border-orange-200 bg-orange-50",
+    accent: "bg-orange-400",
+    marker: "orange",
+  },
+  [REKLAMACJA_STATUS.IN_PROGRESS]: {
     card: "border-rose-200 bg-rose-50",
     accent: "bg-rose-500",
-    badge: "border border-rose-200 bg-rose-100 text-rose-800",
     marker: "red",
+  },
+  [REKLAMACJA_STATUS.WAITING_DELIVERY]: {
+    card: "border-fuchsia-200 bg-fuchsia-50",
+    accent: "bg-fuchsia-500",
+    marker: "fuchsia",
   },
 };
 
@@ -63,53 +67,14 @@ function nextMorningIsoLocal() {
   return formatDateTimeLocal(date);
 }
 
-function getDeadlineMeta(realizacjaDo) {
-  if (!realizacjaDo) {
-    return {
-      tone: "blue",
-      daysUntil: null,
-      label: "Brak terminu dostawy",
-    };
-  }
-
-  const diffMs = new Date(realizacjaDo).getTime() - Date.now();
-  const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-  if (daysUntil <= 2) {
-    return {
-      tone: "red",
-      daysUntil,
-      label:
-        daysUntil <= 0
-          ? "Po terminie lub na dzis"
-          : `${daysUntil} dni do terminu`,
-    };
-  }
-
-  if (daysUntil > 5) {
-    return {
-      tone: "blue",
-      daysUntil,
-      label: `${daysUntil} dni do terminu`,
-    };
-  }
-
-  return {
-    tone: "yellow",
-    daysUntil,
-    label: `${daysUntil} dni do terminu`,
-  };
-}
-
-function LegendDot({ tone }) {
-  const color =
-    tone === "red"
-      ? "bg-rose-500"
-      : tone === "yellow"
-        ? "bg-amber-400"
-        : "bg-sky-400";
-
-  return <span className={`inline-block h-3 w-3 rounded-full ${color}`} />;
+function getCandidateTheme(status) {
+  return (
+    CANDIDATE_STATUS_THEMES[status] || {
+      card: "border-slate-200 bg-slate-50",
+      accent: "bg-slate-400",
+      marker: "neutral",
+    }
+  );
 }
 
 export default function NewRoutePage() {
@@ -127,6 +92,7 @@ export default function NewRoutePage() {
   const [search, setSearch] = useState("");
   const [manualOrder, setManualOrder] = useState(false);
   const [planowanyStartAt, setPlanowanyStartAt] = useState(nextMorningIsoLocal());
+  const [previewComplaint, setPreviewComplaint] = useState(null);
 
   useEffect(() => {
     if (error) {
@@ -222,14 +188,12 @@ export default function NewRoutePage() {
   const decoratedCandidates = useMemo(
     () =>
       candidates.map((candidate) => {
-        const deadline = getDeadlineMeta(candidate.realizacja_do);
         const selectedStop = selectedStopMap.get(candidate.id);
+        const theme = getCandidateTheme(candidate.status);
         return {
           ...candidate,
           selected: selectedIds.includes(candidate.id),
-          tone: deadline.tone,
-          deadlineLabel: deadline.label,
-          daysUntil: deadline.daysUntil,
+          tone: theme.marker,
           order: selectedStop?.order || null,
           eta_from: selectedStop?.eta_from || null,
           eta_to: selectedStop?.eta_to || null,
@@ -272,7 +236,7 @@ export default function NewRoutePage() {
     () =>
       decoratedCandidates.map((candidate) => ({
         ...candidate,
-        tone: DEADLINE_THEMES[candidate.tone]?.marker || "blue",
+        tone: candidate.tone || "neutral",
       })),
     [decoratedCandidates]
   );
@@ -417,16 +381,7 @@ export default function NewRoutePage() {
 
               <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
                 <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
-                  <LegendDot tone="blue" />
-                  <span>{"> 5 dni do terminu"}</span>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
-                  <LegendDot tone="yellow" />
-                  <span>3-5 dni do terminu</span>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
-                  <LegendDot tone="red" />
-                  <span>{"<= 2 dni lub po terminie"}</span>
+                  <span>Kolory kart i znacznikow wynikaja ze statusu reklamacji.</span>
                 </div>
               </div>
             </div>
@@ -448,7 +403,7 @@ export default function NewRoutePage() {
                       type="text"
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Szukaj po firmie, kliencie, telefonie, adresie lub numerze faktury..."
+                      placeholder="Szukaj po firmie, kliencie, telefonie, adresie lub numerze reklamacji..."
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-sky-500"
                     />
                   </div>
@@ -463,8 +418,7 @@ export default function NewRoutePage() {
                 <div className="h-[60vh] min-h-[420px] space-y-4 overflow-y-auto px-4 py-4 md:h-[720px]">
                   {filteredCandidates.length ? (
                     filteredCandidates.map((candidate) => {
-                      const theme =
-                        DEADLINE_THEMES[candidate.tone] || DEADLINE_THEMES.blue;
+                      const theme = getCandidateTheme(candidate.status);
                       const customerName = getComplaintCustomerName(candidate);
                       const customerPhoneHref = getPhoneHref(
                         candidate.telefon_klienta
@@ -513,11 +467,14 @@ export default function NewRoutePage() {
 
                               <div className="mt-4 flex flex-wrap items-center gap-2">
                                 <StatusBadge value={candidate.status} />
-                                <span
-                                  className={`rounded-full px-3 py-1 text-xs font-semibold ${theme.badge}`}
-                                >
-                                  {candidate.deadlineLabel}
-                                </span>
+                                <PickedUpIndicator
+                                  checked={Boolean(candidate.element_odebrany)}
+                                  label={
+                                    candidate.element_odebrany
+                                      ? "Element odebrany"
+                                      : "Element nieodebrany"
+                                  }
+                                />
                                 <Link
                                   href={`/reklamacje/${candidate.id}`}
                                   className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -581,6 +538,10 @@ export default function NewRoutePage() {
                     stops={mapStops}
                     encodedPolyline={preview?.encodedPolyline}
                     height="clamp(320px, 60vh, 720px)"
+                    popupVariant="complaint-candidate"
+                    onShowStopDetails={(stop) =>
+                      setPreviewComplaint(stop.reklamacje || stop)
+                    }
                     renderStopActions={(stop) => (
                       <button
                         type="button"
@@ -805,26 +766,27 @@ export default function NewRoutePage() {
               </div>
 
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
-                <h2 className="text-xl font-semibold">Legenda pilnosci</h2>
-                <div className="mt-5 space-y-3 text-sm text-slate-600">
-                  <div className="flex items-center gap-3">
-                    <LegendDot tone="blue" />
-                    <span>Powyzej 5 dni do terminu</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <LegendDot tone="yellow" />
-                    <span>Od 3 do 5 dni do terminu</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <LegendDot tone="red" />
-                    <span>2 dni lub mniej, albo po terminie</span>
-                  </div>
+                <h2 className="text-xl font-semibold">Statusy kandydatow</h2>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <StatusBadge value={REKLAMACJA_STATUS.NEW} />
+                  <StatusBadge value={REKLAMACJA_STATUS.UPDATED} />
+                  <StatusBadge value={REKLAMACJA_STATUS.IN_PROGRESS} />
+                  <StatusBadge value={REKLAMACJA_STATUS.WAITING_DELIVERY} />
                 </div>
+                <p className="mt-4 text-sm text-slate-600">
+                  Kolory kandydatow i znacznikow na mapie sa zgodne ze statusem
+                  reklamacji.
+                </p>
               </div>
             </div>
           </div>
         </section>
       </div>
+
+      <ComplaintPreviewModal
+        complaint={previewComplaint}
+        onClose={() => setPreviewComplaint(null)}
+      />
     </AppShell>
   );
 }

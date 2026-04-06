@@ -64,6 +64,7 @@ export default function ArchiwumPage() {
       normalizeText(
         [
           reklamacja.nazwa_firmy,
+          reklamacja.nazwa_mebla,
           reklamacja.imie_klienta,
           reklamacja.nazwisko_klienta,
           reklamacja.telefon_klienta,
@@ -105,7 +106,7 @@ export default function ArchiwumPage() {
           type="text"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Szukaj po firmie, numerze reklamacji, mie\u015bcie lub opisie"
+          placeholder="Szukaj po firmie, nazwie mebla, numerze reklamacji, miescie lub opisie"
           className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-400"
         />
       </section>

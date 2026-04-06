@@ -213,6 +213,7 @@ export default function NewRoutePage() {
       const haystack = normalizeText(
         [
           candidate.nazwa_firmy,
+          candidate.nazwa_mebla,
           candidate.imie_klienta,
           candidate.nazwisko_klienta,
           candidate.telefon_klienta,
@@ -403,7 +404,7 @@ export default function NewRoutePage() {
                       type="text"
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Szukaj po firmie, kliencie, telefonie, adresie lub numerze reklamacji..."
+                      placeholder="Szukaj po firmie, meblu, kliencie, telefonie, adresie lub numerze reklamacji..."
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-sky-500"
                     />
                   </div>
@@ -444,6 +445,9 @@ export default function NewRoutePage() {
                               </div>
 
                               <div className="mt-3 space-y-1 text-sm text-slate-600">
+                                {candidate.nazwa_mebla ? (
+                                  <div>Nazwa mebla: {candidate.nazwa_mebla}</div>
+                                ) : null}
                                 <div>
                                   {candidate.kod_pocztowy} {candidate.miejscowosc},{" "}
                                   {candidate.adres}
@@ -625,6 +629,11 @@ export default function NewRoutePage() {
                               <div className="mt-1 text-sm text-slate-600">
                                 {stop.miejscowosc}, {stop.adres}
                               </div>
+                              {stop.nazwa_mebla ? (
+                                <div className="mt-2 text-sm text-slate-600">
+                                  Nazwa mebla: {stop.nazwa_mebla}
+                                </div>
+                              ) : null}
                               {customerName || stop.telefon_klienta ? (
                                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                                   <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200">

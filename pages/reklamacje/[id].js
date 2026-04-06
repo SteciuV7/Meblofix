@@ -33,6 +33,7 @@ import { useEffect, useMemo, useState } from "react";
 function buildEditState(detail) {
   return {
     numer_faktury: detail?.reklamacja?.numer_faktury || "",
+    nazwa_mebla: detail?.reklamacja?.nazwa_mebla || "",
     imie_klienta: detail?.reklamacja?.imie_klienta || "",
     nazwisko_klienta: detail?.reklamacja?.nazwisko_klienta || "",
     telefon_klienta: detail?.reklamacja?.telefon_klienta || "",
@@ -371,6 +372,14 @@ export default function ReklamacjaDetailPage() {
                 <div className="mt-6 grid gap-3 md:grid-cols-3">
                   <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Nazwa mebla
+                    </div>
+                    <div className="mt-2 font-semibold text-slate-950">
+                      {detail.reklamacja.nazwa_mebla || "-"}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                       Klient
                     </div>
                     <div className="mt-2 font-semibold text-slate-950">
@@ -436,6 +445,21 @@ export default function ReklamacjaDetailPage() {
                         setEditState((current) => ({
                           ...current,
                           numer_faktury: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="text-sm text-slate-700">
+                    Nazwa mebla
+                    <input
+                      required
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
+                      value={editState.nazwa_mebla}
+                      placeholder="Nazwa mebla"
+                      onChange={(event) =>
+                        setEditState((current) => ({
+                          ...current,
+                          nazwa_mebla: event.target.value,
                         }))
                       }
                     />

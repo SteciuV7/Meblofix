@@ -519,6 +519,7 @@ export default function RouteDetailPage() {
                   lat: stop.reklamacje.lat,
                   lon: stop.reklamacje.lon,
                   nazwa_firmy: stop.reklamacje.nazwa_firmy,
+                  nazwa_mebla: stop.reklamacje.nazwa_mebla,
                   imie_klienta: stop.reklamacje.imie_klienta,
                   nazwisko_klienta: stop.reklamacje.nazwisko_klienta,
                   telefon_klienta: stop.reklamacje.telefon_klienta,

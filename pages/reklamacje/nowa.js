@@ -31,6 +31,7 @@ function emptyForm() {
     firma_id: "",
     nazwa_firmy: "",
     numer_faktury: "",
+    nazwa_mebla: "",
     imie_klienta: "",
     nazwisko_klienta: "",
     telefon_klienta: "",
@@ -278,6 +279,7 @@ export default function NewReklamacjaPage() {
   const [imagePreviewUrls, setImagePreviewUrls] = useState(
     emptyImageSlots().map(() => "")
   );
+  const [furnitureError, setFurnitureError] = useState("");
   const [pdfError, setPdfError] = useState("");
   const [imageError, setImageError] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
@@ -447,11 +449,17 @@ export default function NewReklamacjaPage() {
   }
 
   function validateBeforeAddressPreview() {
+    if (!form.nazwa_mebla.trim()) {
+      setFurnitureError("Nazwa mebla jest wymagana.");
+      return false;
+    }
+
     if (!pdfFile) {
       setPdfError("Zalacznik PDF jest wymagany.");
       return false;
     }
 
+    setFurnitureError("");
     setPdfError("");
     return true;
   }
@@ -605,6 +613,40 @@ export default function NewReklamacjaPage() {
                   }))
                 }
               />
+            </label>
+
+            <label className="block text-sm text-slate-700">
+              Nazwa mebla
+              <input
+                required
+                className={`mt-2 w-full rounded-2xl border px-4 py-3 ${
+                  furnitureError ? "border-rose-300" : "border-slate-200"
+                }`}
+                value={form.nazwa_mebla}
+                placeholder="Nazwa mebla"
+                onChange={(event) => {
+                  if (event.target.value.trim()) {
+                    setFurnitureError("");
+                  }
+
+                  setForm((current) => ({
+                    ...current,
+                    nazwa_mebla: event.target.value,
+                  }));
+                }}
+                onBlur={() => {
+                  if (form.nazwa_mebla.trim()) {
+                    setFurnitureError("");
+                  }
+                }}
+              />
+              <div className="mt-2 text-xs text-slate-500">
+                To, co zostanie wpisane w to pole, bedzie automatycznie
+                przekazane klientowi, uwaga na pisownie.
+              </div>
+              {furnitureError ? (
+                <div className="mt-2 text-xs text-rose-600">{furnitureError}</div>
+              ) : null}
             </label>
 
             <label className="block text-sm text-slate-700">

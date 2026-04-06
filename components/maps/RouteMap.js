@@ -298,6 +298,8 @@ export default function RouteMap({
             .join(" ");
           const complaintNumber =
             complaint?.numer_faktury || complaint?.nr_reklamacji || "-";
+          const furnitureName =
+            stop.nazwa_mebla || complaint?.nazwa_mebla || "-";
           const description = complaint?.opis?.trim() || "-";
 
           return (
@@ -366,6 +368,15 @@ export default function RouteMap({
 
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Nazwa mebla
+                      </div>
+                      <div className="mt-1 text-slate-700">
+                        {furnitureName}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Opis
                       </div>
                       <div className="mt-1 whitespace-pre-wrap text-slate-700">
@@ -420,6 +431,11 @@ export default function RouteMap({
                         {stop.miejscowosc || complaint?.miejscowosc},{" "}
                         {stop.adres || complaint?.adres}
                       </div>
+                      {furnitureName && furnitureName !== "-" ? (
+                        <div className="mt-2 text-slate-700">
+                          Nazwa mebla: {furnitureName}
+                        </div>
+                      ) : null}
                       {customerName || customerPhone ? (
                         <div className="mt-2 space-y-1 text-slate-700">
                           {customerName ? (

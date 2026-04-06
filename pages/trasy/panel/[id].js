@@ -340,6 +340,14 @@ export default function DriverRoutePage() {
                       </div>
                       <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700">
                         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Nazwa mebla
+                        </div>
+                        <div className="mt-2 font-semibold text-slate-950">
+                          {nextComplaint.nazwa_mebla || "-"}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Klient
                         </div>
                         <div className="mt-2 font-semibold text-slate-950">
@@ -477,6 +485,7 @@ export default function DriverRoutePage() {
                   lat: stop.reklamacje.lat,
                   lon: stop.reklamacje.lon,
                   nazwa_firmy: stop.reklamacje.nazwa_firmy,
+                  nazwa_mebla: stop.reklamacje.nazwa_mebla,
                   imie_klienta: stop.reklamacje.imie_klienta,
                   nazwisko_klienta: stop.reklamacje.nazwisko_klienta,
                   telefon_klienta: stop.reklamacje.telefon_klienta,

@@ -85,6 +85,10 @@ export default function ComplaintPreviewModal({ complaint, onClose }) {
                   {complaintNumber}
                 </div>
                 <div>
+                  <span className="font-semibold">Nazwa mebla:</span>{" "}
+                  {complaint.nazwa_mebla || "-"}
+                </div>
+                <div>
                   <span className="font-semibold">Kod pocztowy:</span>{" "}
                   {complaint.kod_pocztowy || "-"}
                 </div>

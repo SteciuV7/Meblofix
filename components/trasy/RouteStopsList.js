@@ -86,6 +86,11 @@ export default function RouteStopsList({
                     {complaint.miejscowosc || complaint.adres ? ", " : ""}
                     {complaint.adres}
                   </div>
+                  {complaint.nazwa_mebla ? (
+                    <div className="mt-2 text-sm text-slate-600">
+                      Nazwa mebla: {complaint.nazwa_mebla}
+                    </div>
+                  ) : null}
                   {customerName || complaint.telefon_klienta ? (
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700">

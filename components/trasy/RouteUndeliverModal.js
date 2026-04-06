@@ -50,6 +50,11 @@ export default function RouteUndeliverModal({
               {stop.reklamacje?.miejscowosc || stop.reklamacje?.adres ? ", " : ""}
               {stop.reklamacje?.adres}
             </div>
+            {stop.reklamacje?.nazwa_mebla ? (
+              <div className="mt-2 text-sm text-slate-700">
+                Nazwa mebla: {stop.reklamacje.nazwa_mebla}
+              </div>
+            ) : null}
             {customerName || stop.reklamacje?.telefon_klienta ? (
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
                 {customerName ? (

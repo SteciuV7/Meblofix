@@ -92,6 +92,9 @@ export default function ComplaintAcceptModal({
               Numer: {reklamacja.nr_reklamacji || reklamacja.numer_faktury || "-"}
             </div>
             <div className="mt-1">
+              Nazwa mebla: {reklamacja.nazwa_mebla || "-"}
+            </div>
+            <div className="mt-1">
               Po zapisie status zmieni sie na{" "}
               <span className="font-semibold text-slate-950">
                 W trakcie realizacji

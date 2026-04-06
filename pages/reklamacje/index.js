@@ -260,6 +260,7 @@ export default function ReklamacjeIndexPage() {
       return normalizeText(
         [
           reklamacja.nazwa_firmy,
+          reklamacja.nazwa_mebla,
           reklamacja.imie_klienta,
           reklamacja.nazwisko_klienta,
           reklamacja.telefon_klienta,
@@ -341,7 +342,7 @@ export default function ReklamacjeIndexPage() {
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Firma, klient, telefon, numer reklamacji, miasto, adres..."
+              placeholder="Firma, mebel, klient, telefon, numer reklamacji, miasto, adres..."
               className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-[13px] outline-none transition focus:border-slate-400"
             />
           </FilterField>

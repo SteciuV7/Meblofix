@@ -112,6 +112,13 @@ export default function RouteDetailPage() {
       )
       .filter(Boolean);
   }, [detail?.stops, orderedIds]);
+  const pendingBatchConfirmationStopsCount = useMemo(
+    () =>
+      orderedStops.filter(
+        (stop) => stop.smsConfirmationStatus === SMS_CONFIRMATION_STATUS.NOT_SENT
+      ).length,
+    [orderedStops]
+  );
 
   const closeTargetStop = useMemo(
     () => orderedStops.find((stop) => stop.id === closeTargetStopId) || null,
@@ -134,9 +141,8 @@ export default function RouteDetailPage() {
     detail?.stops?.every((stop) => ROUTE_STOP_FINAL_STATUSES.includes(stop.status));
   const canSendBatchConfirmationSms =
     detail?.route?.status === ROUTE_STATUS.PLANNED &&
-    !detail?.route?.smsConfirmationsSentAt &&
     !isEditingRoute &&
-    detail?.stops?.length > 0;
+    pendingBatchConfirmationStopsCount > 0;
   const routeEdited =
     isEditingRoute &&
     (!areOrderedIdsEqual(orderedIds, originalOrderedIds) ||
@@ -255,7 +261,7 @@ export default function RouteDetailPage() {
       });
       await refresh();
 
-      const summary = `Wyslano ${response.sentCount}/${response.totalCount} SMS potwierdzen.`;
+      const summary = `Wyslano ${response.sentCount}/${response.totalCount} SMS potwierdzen dla punktow z szara lampka.`;
       if (response?.warnings?.length) {
         setFeedback(
           buildFeedback("warning", `${summary} Ostrzezenia: ${response.warnings.join(" | ")}`)
@@ -410,7 +416,7 @@ export default function RouteDetailPage() {
                 onClick={handleSendBatchConfirmationSms}
                 disabled={saving}
               >
-                Wyslij potwierdzenia SMS
+                Wyslij SMS dla szarych
               </button>
             ) : null}
             {canEditRoute && !isEditingRoute ? (
@@ -536,7 +542,7 @@ export default function RouteDetailPage() {
                     </h2>
                     {detail.route.smsConfirmationsSentAt ? (
                       <div className="mt-2 text-sm text-amber-700">
-                        Zbiorcze potwierdzenia SMS wyslano:{" "}
+                        Ostatnia wysylka zbiorcza SMS:{" "}
                         {formatDate(detail.route.smsConfirmationsSentAt, true)}
                       </div>
                     ) : null}
@@ -689,10 +695,10 @@ export default function RouteDetailPage() {
                   <div>Notatki: {detail.route.notes || "-"}</div>
                   <div>Punkty: {detail.stops.length}</div>
                   <div>
-                    Potwierdzenia SMS:{" "}
+                    Ostatnia wysylka zbiorcza SMS:{" "}
                     {detail.route.smsConfirmationsSentAt
                       ? formatDate(detail.route.smsConfirmationsSentAt, true)
-                      : "jeszcze nie wyslane"}
+                      : "brak"}
                   </div>
                 </div>
               </div>

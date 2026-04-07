@@ -218,7 +218,7 @@ export default function SettingsPage() {
     <AppShell
       profile={profile}
       title="Ustawienia"
-      subtitle="Konfiguracja aktywnej bazy operacyjnej, ETA i szablonow SMS dla klienta."
+      subtitle="Konfiguracja aktywnej bazy operacyjnej, domyslnego czasu postoju, ETA i szablonow SMS dla klienta."
     >
       {loadingSettings ? (
         <ScreenState
@@ -257,7 +257,8 @@ export default function SettingsPage() {
                   <p className="mt-2 max-w-2xl text-sm text-slate-600">
                     Zmiany zapisane tutaj trafia do aktywnego wpisu w tabeli
                     `ustawienia_operacyjne` i beda od razu wykorzystywane przez
-                    planowanie tras oraz powiadomienia SMS.
+                    planowanie tras oraz powiadomienia SMS. Domyslny czas postoju
+                    jest wartoscia startowa dla nowo dodawanych punktow trasy.
                   </p>
                 </div>
                 <div className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-semibold text-emerald-700">
@@ -319,7 +320,7 @@ export default function SettingsPage() {
                 </label>
 
                 <label className="text-sm text-slate-700">
-                  Domyslny czas obslugi [min]
+                  Domyslny czas postoju [min]
                   <input
                     name="domyslny_czas_obslugi_min"
                     type="number"
@@ -441,7 +442,7 @@ export default function SettingsPage() {
                   Wspolrzedne: {savedSettings.lat}, {savedSettings.lon}
                 </div>
                 <div>
-                  Domyslny czas obslugi:{" "}
+                  Domyslny czas postoju:{" "}
                   {savedSettings.domyslny_czas_obslugi_min} min
                 </div>
                 <div>
@@ -490,7 +491,8 @@ export default function SettingsPage() {
               <p className="mt-4 text-sm leading-6 text-slate-300">
                 Te wartosci sa uzywane przy wyliczaniu punktu startowego,
                 powrotu do bazy, lampki SMS oraz tresci wiadomosci wysylanych
-                klientowi.
+                klientowi. Domyslny czas postoju jest podstawiany przy dodawaniu
+                punktu do trasy i moze byc potem zmieniony indywidualnie.
               </p>
             </section>
           </div>

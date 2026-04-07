@@ -45,6 +45,7 @@ export default async function handler(req, res) {
       notes,
       dryRun = false,
       optimize = true,
+      czasyPostojuMinByReklamacjaId = {},
     } = req.body || {};
 
     if (!planowanyStartAt) {
@@ -56,6 +57,7 @@ export default async function handler(req, res) {
         reklamacjeIds,
         planowanyStartAt,
         optimize,
+        czasyPostojuMinByReklamacjaId,
       });
       sendJson(res, 200, preview);
       return;
@@ -68,6 +70,7 @@ export default async function handler(req, res) {
       notes,
       actor,
       optimize,
+      czasyPostojuMinByReklamacjaId,
     });
 
     sendJson(res, 201, result);

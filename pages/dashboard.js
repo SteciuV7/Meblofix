@@ -35,6 +35,13 @@ const adminModules = [
     description: "Widok wszystkich tras z metrykami, statusami i logami.",
   },
   {
+    href: "/rozliczenia",
+    title: "Rozliczenia",
+    emoji: "\u{1F4C4}",
+    description:
+      "Okresowe zestawienia zakonczonych reklamacji z eksportem PDF dla wybranej firmy.",
+  },
+  {
     href: "/ustawienia",
     title: "Ustawienia",
     emoji: "\u2699\uFE0F",

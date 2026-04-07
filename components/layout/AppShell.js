@@ -16,6 +16,7 @@ const baseLinks = [
 
 const adminLinks = [
   { href: "/trasy", label: "Trasy" },
+  { href: "/rozliczenia", label: "Rozliczenia" },
   { href: "/ustawienia", label: "Ustawienia" },
   { href: "/trasy/panel", label: "Panel kierowcy" },
   { href: "/uzytkownicy", label: "Uzytkownicy" },

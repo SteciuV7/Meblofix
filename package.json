@@ -17,6 +17,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.483.0",
     "next": "^15.3.2",
+    "pdfkit": "^0.18.0",
     "postcss": "^8.5.3",
     "react": "^19.0.0",
     "react-date-range": "^2.0.1",

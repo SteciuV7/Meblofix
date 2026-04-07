@@ -27,6 +27,35 @@ export function RouteEtaBadge({ etaFrom, etaTo, className }) {
   );
 }
 
+export function RouteStopDurationField({
+  value,
+  onChange,
+  disabled = false,
+  className,
+}) {
+  return (
+    <label
+      className={cn(
+        "block rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-left shadow-sm",
+        className
+      )}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+        Czas postoju [min]
+      </div>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        value={value ?? ""}
+        onChange={onChange}
+        disabled={disabled}
+        className="mt-2 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none transition focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+      />
+    </label>
+  );
+}
+
 export function RouteLegConnector({
   durationSeconds,
   className,

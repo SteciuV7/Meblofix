@@ -13,6 +13,7 @@ export default async function handler(req, res) {
       reklamacjeIds = [],
       planowanyStartAt,
       resetSmsConfirmations = false,
+      czasyPostojuMinByReklamacjaId = {},
     } = req.body || {};
     const result = await recalculateRoute({
       routeId: req.query.id,
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
       planowanyStartAt,
       actor,
       resetSmsConfirmations,
+      czasyPostojuMinByReklamacjaId,
     });
     sendJson(res, 200, result);
   } catch (error) {

@@ -7,8 +7,13 @@ import {
   RouteBaseCard,
   RouteEtaBadge,
   RouteLegConnector,
+  RouteStopDurationField,
 } from "@/components/trasy/RouteTiming";
-import { REKLAMACJA_STATUS, ROLE } from "@/lib/constants";
+import {
+  DEFAULT_OPERATIONAL_SETTINGS,
+  REKLAMACJA_STATUS,
+  ROLE,
+} from "@/lib/constants";
 import { apiFetch } from "@/lib/client-api";
 import { useCurrentProfile } from "@/lib/use-current-profile";
 import {
@@ -77,6 +82,26 @@ function getCandidateTheme(status) {
   );
 }
 
+function getDefaultStopPostojMinutes(settings) {
+  const parsed = Number(settings?.domyslny_czas_obslugi_min);
+
+  if (Number.isInteger(parsed) && parsed > 0) {
+    return parsed;
+  }
+
+  return DEFAULT_OPERATIONAL_SETTINGS.domyslny_czas_obslugi_min;
+}
+
+function normalizeStopPostojMinutes(value, fallbackMinutes) {
+  const parsed = Number(value);
+
+  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 1440) {
+    return parsed;
+  }
+
+  return fallbackMinutes;
+}
+
 export default function NewRoutePage() {
   const router = useRouter();
   const { profile, loading, error } = useCurrentProfile();
@@ -86,6 +111,7 @@ export default function NewRoutePage() {
   const [preview, setPreview] = useState(null);
   const [candidatesError, setCandidatesError] = useState(null);
   const [previewError, setPreviewError] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [routeName, setRouteName] = useState("");
   const [notes, setNotes] = useState("");
@@ -93,6 +119,8 @@ export default function NewRoutePage() {
   const [manualOrder, setManualOrder] = useState(false);
   const [planowanyStartAt, setPlanowanyStartAt] = useState(nextMorningIsoLocal());
   const [previewComplaint, setPreviewComplaint] = useState(null);
+  const [czasyPostojuMinByReklamacjaId, setCzasyPostojuMinByReklamacjaId] =
+    useState({});
 
   useEffect(() => {
     if (error) {
@@ -130,17 +158,32 @@ export default function NewRoutePage() {
     };
   }, [profile, router]);
 
+  const selectedStopPostojPayload = useMemo(() => {
+    const fallbackMinutes = getDefaultStopPostojMinutes(operationalSettings);
+
+    return Object.fromEntries(
+      selectedIds.map((reklamacjaId) => [
+        reklamacjaId,
+        normalizeStopPostojMinutes(
+          czasyPostojuMinByReklamacjaId[reklamacjaId],
+          fallbackMinutes
+        ),
+      ])
+    );
+  }, [czasyPostojuMinByReklamacjaId, operationalSettings, selectedIds]);
+
   useEffect(() => {
     if (!selectedIds.length) {
       setPreview(null);
       setPreviewError(null);
+      setPreviewLoading(false);
       return;
     }
 
     let active = true;
-
-    async function recalc() {
+    const timeoutId = setTimeout(async () => {
       try {
+        setPreviewLoading(true);
         const response = await apiFetch("/api/trasy", {
           method: "POST",
           body: JSON.stringify({
@@ -148,27 +191,34 @@ export default function NewRoutePage() {
             reklamacjeIds: selectedIds,
             planowanyStartAt: new Date(planowanyStartAt).toISOString(),
             optimize: !manualOrder,
+            czasyPostojuMinByReklamacjaId: selectedStopPostojPayload,
           }),
         });
 
         if (!active) return;
         setPreviewError(null);
         setPreview(response);
-        if (response.settings) {
-          setOperationalSettings(response.settings);
-        }
       } catch (err) {
         if (!active) return;
         setPreview(null);
         setPreviewError(err.message || "Nie udalo sie policzyc trasy.");
+      } finally {
+        if (active) {
+          setPreviewLoading(false);
+        }
       }
-    }
+    }, 400);
 
-    recalc();
     return () => {
       active = false;
+      clearTimeout(timeoutId);
     };
-  }, [manualOrder, planowanyStartAt, selectedIds]);
+  }, [
+    manualOrder,
+    planowanyStartAt,
+    selectedIds,
+    selectedStopPostojPayload,
+  ]);
 
   const selectedStops = useMemo(() => {
     if (!preview?.orderedStops?.length) {
@@ -256,6 +306,7 @@ export default function NewRoutePage() {
           routeName: routeName.trim() || null,
           notes,
           optimize: !manualOrder,
+          czasyPostojuMinByReklamacjaId: selectedStopPostojPayload,
         }),
       });
       router.push(`/trasy/${response.routeId}`);
@@ -268,6 +319,14 @@ export default function NewRoutePage() {
 
   function addCandidate(candidateId) {
     setPreviewError(null);
+    setCzasyPostojuMinByReklamacjaId((current) =>
+      current[candidateId]
+        ? current
+        : {
+            ...current,
+            [candidateId]: getDefaultStopPostojMinutes(operationalSettings),
+          }
+    );
     setSelectedIds((current) =>
       current.includes(candidateId) ? current : [...current, candidateId]
     );
@@ -291,15 +350,39 @@ export default function NewRoutePage() {
     setPreviewError(null);
     setManualOrder(true);
     setSelectedIds((current) => {
-      const index = current.indexOf(candidateId);
+      const sourceOrder =
+        !manualOrder && selectedStops.length
+          ? selectedStops.map((stop) => stop.id)
+          : current;
+      const index = sourceOrder.indexOf(candidateId);
       const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) {
+      if (index < 0 || nextIndex < 0 || nextIndex >= sourceOrder.length) {
         return current;
       }
-      const updated = [...current];
+      const updated = [...sourceOrder];
       [updated[index], updated[nextIndex]] = [updated[nextIndex], updated[index]];
       return updated;
     });
+  }
+
+  function handleStopPostojChange(reklamacjaId, value) {
+    if (!`${value ?? ""}`.trim()) {
+      return;
+    }
+
+    const nextValue = Math.min(
+      1440,
+      Math.max(
+        1,
+        normalizeStopPostojMinutes(value, getDefaultStopPostojMinutes(activeSettings))
+      )
+    );
+
+    setPreviewError(null);
+    setCzasyPostojuMinByReklamacjaId((current) => ({
+      ...current,
+      [reklamacjaId]: nextValue,
+    }));
   }
 
   if (loading) {
@@ -575,19 +658,26 @@ export default function NewRoutePage() {
             <div className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">Wybrane punkty</h2>
-                {manualOrder ? (
-                  <button
-                    type="button"
-                    className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-                    onClick={() => setManualOrder(false)}
-                  >
-                    Wlacz autooptymalizacje
-                  </button>
-                ) : (
-                  <span className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-semibold text-emerald-700">
-                    Autooptymalizacja wlaczona
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {previewLoading ? (
+                    <span className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700">
+                      Przeliczanie ETA...
+                    </span>
+                  ) : null}
+                  {manualOrder ? (
+                    <button
+                      type="button"
+                      className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                      onClick={() => setManualOrder(false)}
+                    >
+                      Wlacz autooptymalizacje
+                    </button>
+                  ) : (
+                    <span className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-semibold text-emerald-700">
+                      Autooptymalizacja wlaczona
+                    </span>
+                  )}
+                </div>
               </div>
 
               {selectedStops.length ? (
@@ -681,6 +771,13 @@ export default function NewRoutePage() {
                                 etaTo={stop.eta_to}
                                 className="w-full sm:w-[220px]"
                               />
+                              <RouteStopDurationField
+                                value={selectedStopPostojPayload[stop.id]}
+                                onChange={(event) =>
+                                  handleStopPostojChange(stop.id, event.target.value)
+                                }
+                                className="w-full sm:w-[220px]"
+                              />
                               <div className="flex flex-wrap gap-2 sm:justify-end">
                                 <button
                                   type="button"
@@ -768,7 +865,13 @@ export default function NewRoutePage() {
                   type="button"
                   className="mt-6 w-full rounded-full bg-sky-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={handleCreateRoute}
-                  disabled={saving || !selectedIds.length}
+                  disabled={
+                    saving ||
+                    previewLoading ||
+                    !selectedIds.length ||
+                    Boolean(previewError) ||
+                    !preview
+                  }
                 >
                   {saving ? "Tworzenie..." : "Utworz trase"}
                 </button>

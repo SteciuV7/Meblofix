@@ -25,6 +25,7 @@ export default function RouteStopsList({
   returnEtaAt,
   renderPointActions,
   renderPhoneAccessory,
+  renderTimingAccessory,
   highlightedStopId = null,
 }) {
   if (!stops.length) {
@@ -61,6 +62,9 @@ export default function RouteStopsList({
         const pointActions = renderPointActions ? renderPointActions(stop, index) : null;
         const phoneAccessory = renderPhoneAccessory
           ? renderPhoneAccessory(stop, index)
+          : null;
+        const timingAccessory = renderTimingAccessory
+          ? renderTimingAccessory(stop, index)
           : null;
         const hasPointActions = Children.count(pointActions) > 0;
         const isHighlighted = highlightedStopId && highlightedStopId === stop.id;
@@ -143,6 +147,7 @@ export default function RouteStopsList({
                     etaTo={stop.eta_to}
                     className="w-full sm:w-[220px]"
                   />
+                  {timingAccessory}
                   {hasPointActions ? (
                     <div className="flex flex-wrap gap-2 sm:justify-end">{pointActions}</div>
                   ) : null}

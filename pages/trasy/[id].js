@@ -6,6 +6,7 @@ import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
 import RouteRecalculateModal from "@/components/trasy/RouteRecalculateModal";
 import RouteSmsStatusControl from "@/components/trasy/RouteSmsStatusControl";
 import RouteStopsList from "@/components/trasy/RouteStopsList";
+import { RouteStopDurationField } from "@/components/trasy/RouteTiming";
 import {
   ROLE,
   ROUTE_STATUS,
@@ -43,6 +44,22 @@ function areOrderedIdsEqual(left = [], right = []) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function areStopPostojMapsEqual(reklamacjeIds = [], left = {}, right = {}) {
+  return reklamacjeIds.every(
+    (reklamacjaId) => Number(left[reklamacjaId]) === Number(right[reklamacjaId])
+  );
+}
+
+function normalizeStopPostojMinutes(value, fallbackMinutes) {
+  const parsed = Number(value);
+
+  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 1440) {
+    return parsed;
+  }
+
+  return fallbackMinutes;
+}
+
 function buildFeedback(tone, text) {
   return text ? { tone, text } : null;
 }
@@ -56,9 +73,14 @@ export default function RouteDetailPage() {
   const [saving, setSaving] = useState(false);
   const [orderedIds, setOrderedIds] = useState([]);
   const [planowanyStartAt, setPlanowanyStartAt] = useState("");
+  const [czasyPostojuMinByReklamacjaId, setCzasyPostojuMinByReklamacjaId] =
+    useState({});
   const [closeTargetStopId, setCloseTargetStopId] = useState(null);
   const [isEditingRoute, setIsEditingRoute] = useState(false);
   const [recalculateModalOpen, setRecalculateModalOpen] = useState(false);
+  const [editPreview, setEditPreview] = useState(null);
+  const [editPreviewLoading, setEditPreviewLoading] = useState(false);
+  const [editPreviewError, setEditPreviewError] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
   useEffect(() => {
@@ -85,7 +107,14 @@ export default function RouteDetailPage() {
         setDetail(response);
         setOrderedIds((response.stops || []).map((stop) => stop.reklamacja_id));
         setPlanowanyStartAt(toDateTimeLocalValue(response.route?.planowany_start_at));
+        setCzasyPostojuMinByReklamacjaId(
+          Object.fromEntries(
+            (response.stops || []).map((stop) => [stop.reklamacja_id, stop.czas_postoju_min])
+          )
+        );
         setIsEditingRoute(false);
+        setEditPreview(null);
+        setEditPreviewError(null);
       } catch (err) {
         if (!active) return;
         setLoadError(err.message || "Nie udalo sie pobrac trasy.");
@@ -102,6 +131,26 @@ export default function RouteDetailPage() {
     () => (detail?.stops || []).map((stop) => stop.reklamacja_id),
     [detail?.stops]
   );
+  const originalStopPostojMap = useMemo(
+    () =>
+      Object.fromEntries(
+        (detail?.stops || []).map((stop) => [stop.reklamacja_id, stop.czas_postoju_min])
+      ),
+    [detail?.stops]
+  );
+  const currentStopPostojPayload = useMemo(
+    () =>
+      Object.fromEntries(
+        orderedIds.map((reklamacjaId) => [
+          reklamacjaId,
+          normalizeStopPostojMinutes(
+            czasyPostojuMinByReklamacjaId[reklamacjaId],
+            originalStopPostojMap[reklamacjaId]
+          ),
+        ])
+      ),
+    [czasyPostojuMinByReklamacjaId, orderedIds, originalStopPostojMap]
+  );
 
   const orderedStops = useMemo(() => {
     if (!detail?.stops?.length) return [];
@@ -112,6 +161,108 @@ export default function RouteDetailPage() {
       )
       .filter(Boolean);
   }, [detail?.stops, orderedIds]);
+
+  useEffect(() => {
+    if (!isEditingRoute) {
+      setEditPreview(null);
+      setEditPreviewError(null);
+      setEditPreviewLoading(false);
+      return;
+    }
+
+    if (!orderedIds.length || !planowanyStartAt) {
+      setEditPreview(null);
+      setEditPreviewError(null);
+      setEditPreviewLoading(false);
+      return;
+    }
+
+    let active = true;
+    const timeoutId = setTimeout(async () => {
+      try {
+        setEditPreviewLoading(true);
+        const response = await apiFetch("/api/trasy", {
+          method: "POST",
+          body: JSON.stringify({
+            dryRun: true,
+            reklamacjeIds: orderedIds,
+            planowanyStartAt: new Date(planowanyStartAt).toISOString(),
+            optimize: false,
+            czasyPostojuMinByReklamacjaId: currentStopPostojPayload,
+          }),
+        });
+
+        if (!active) {
+          return;
+        }
+
+        setEditPreview(response);
+        setEditPreviewError(null);
+      } catch (err) {
+        if (!active) {
+          return;
+        }
+
+        setEditPreview(null);
+        setEditPreviewError(err.message || "Nie udalo sie przeliczyc trasy.");
+      } finally {
+        if (active) {
+          setEditPreviewLoading(false);
+        }
+      }
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [currentStopPostojPayload, isEditingRoute, orderedIds, planowanyStartAt]);
+
+  const editingPreviewStops = useMemo(() => {
+    if (!isEditingRoute) {
+      return [];
+    }
+
+    const previewStopMap = new Map(
+      (editPreview?.orderedStops || []).map((stop) => [stop.id, stop])
+    );
+
+    return orderedIds
+      .map((reklamacjaId, index) => {
+        const previewStop = previewStopMap.get(reklamacjaId);
+
+        if (previewStop) {
+          return {
+            ...previewStop,
+            reklamacja_id: reklamacjaId,
+            kolejnosc: index + 1,
+            status: "planned",
+            czas_postoju_min: currentStopPostojPayload[reklamacjaId],
+          };
+        }
+
+        const currentStop = orderedStops.find(
+          (stop) => stop.reklamacja_id === reklamacjaId
+        );
+
+        if (!currentStop) {
+          return null;
+        }
+
+        return {
+          ...currentStop,
+          kolejnosc: index + 1,
+          czas_postoju_min: currentStopPostojPayload[reklamacjaId],
+        };
+      })
+      .filter(Boolean);
+  }, [
+    currentStopPostojPayload,
+    editPreview?.orderedStops,
+    isEditingRoute,
+    orderedIds,
+    orderedStops,
+  ]);
   const pendingBatchConfirmationStopsCount = useMemo(
     () =>
       orderedStops.filter(
@@ -125,10 +276,6 @@ export default function RouteDetailPage() {
     [closeTargetStopId, orderedStops]
   );
 
-  const routeBaseAddress =
-    detail?.mapBase?.adres_bazy ||
-    detail?.route?.base_address_snapshot ||
-    "Brak adresu magazynu";
   const canEditRoute =
     detail?.route?.status === ROUTE_STATUS.PLANNED && detail?.stops?.length > 0;
   const canStart =
@@ -143,10 +290,37 @@ export default function RouteDetailPage() {
     detail?.route?.status === ROUTE_STATUS.PLANNED &&
     !isEditingRoute &&
     pendingBatchConfirmationStopsCount > 0;
+  const displayStops = isEditingRoute ? editingPreviewStops : orderedStops;
+  const routeBaseAddress =
+    (isEditingRoute ? editPreview?.settings?.adres_bazy : null) ||
+    detail?.mapBase?.adres_bazy ||
+    detail?.route?.base_address_snapshot ||
+    "Brak adresu magazynu";
+  const displayDistanceMeters =
+    isEditingRoute && editPreview
+      ? editPreview.totalDistanceMeters
+      : detail?.route?.total_distance_m;
+  const displayDurationSeconds =
+    isEditingRoute && editPreview
+      ? editPreview.totalDurationSeconds
+      : detail?.route?.total_duration_s;
+  const displayEncodedPolyline =
+    isEditingRoute && editPreview ? editPreview.encodedPolyline : detail?.encodedPolyline;
+  const displayReturnLegDurationSeconds =
+    isEditingRoute && editPreview
+      ? editPreview.returnLegDurationSeconds
+      : detail?.returnLegDurationSeconds;
+  const displayReturnEtaAt =
+    isEditingRoute && editPreview ? editPreview.returnEtaAt : detail?.returnEtaAt;
   const routeEdited =
     isEditingRoute &&
     (!areOrderedIdsEqual(orderedIds, originalOrderedIds) ||
-      planowanyStartAt !== toDateTimeLocalValue(detail?.route?.planowany_start_at));
+      planowanyStartAt !== toDateTimeLocalValue(detail?.route?.planowany_start_at) ||
+      !areStopPostojMapsEqual(
+        orderedIds,
+        currentStopPostojPayload,
+        originalStopPostojMap
+      ));
 
   async function refresh({ preserveEditing = false } = {}) {
     const response = await apiFetch(`/api/trasy/${id}`);
@@ -154,8 +328,15 @@ export default function RouteDetailPage() {
     setDetail(response);
     setOrderedIds((response.stops || []).map((stop) => stop.reklamacja_id));
     setPlanowanyStartAt(toDateTimeLocalValue(response.route?.planowany_start_at));
+    setCzasyPostojuMinByReklamacjaId(
+      Object.fromEntries(
+        (response.stops || []).map((stop) => [stop.reklamacja_id, stop.czas_postoju_min])
+      )
+    );
     if (!preserveEditing) {
       setIsEditingRoute(false);
+      setEditPreview(null);
+      setEditPreviewError(null);
     }
   }
 
@@ -180,17 +361,43 @@ export default function RouteDetailPage() {
 
   function handleEnableEditing() {
     setFeedback(null);
+    setEditPreviewError(null);
     setOrderedIds(originalOrderedIds);
     setPlanowanyStartAt(toDateTimeLocalValue(detail?.route?.planowany_start_at));
+    setCzasyPostojuMinByReklamacjaId(originalStopPostojMap);
     setIsEditingRoute(true);
   }
 
   function handleCancelEditing() {
     setFeedback(null);
+    setEditPreview(null);
+    setEditPreviewError(null);
     setOrderedIds(originalOrderedIds);
     setPlanowanyStartAt(toDateTimeLocalValue(detail?.route?.planowany_start_at));
+    setCzasyPostojuMinByReklamacjaId(originalStopPostojMap);
     setIsEditingRoute(false);
     setRecalculateModalOpen(false);
+  }
+
+  function handleStopPostojChange(reklamacjaId, value) {
+    if (!`${value ?? ""}`.trim()) {
+      return;
+    }
+
+    const nextValue = Math.min(
+      1440,
+      Math.max(
+        1,
+        normalizeStopPostojMinutes(value, originalStopPostojMap[reklamacjaId])
+      )
+    );
+
+    setFeedback(null);
+    setEditPreviewError(null);
+    setCzasyPostojuMinByReklamacjaId((current) => ({
+      ...current,
+      [reklamacjaId]: nextValue,
+    }));
   }
 
   async function handleRecalculateConfirm({ resetSmsConfirmations }) {
@@ -202,6 +409,7 @@ export default function RouteDetailPage() {
           reklamacjeIds: orderedIds,
           planowanyStartAt: new Date(planowanyStartAt).toISOString(),
           resetSmsConfirmations,
+          czasyPostojuMinByReklamacjaId: currentStopPostojPayload,
         }),
       });
       await refresh();
@@ -485,6 +693,12 @@ export default function RouteDetailPage() {
                 </div>
               ) : null}
 
+              {isEditingRoute && editPreviewError ? (
+                <div className="rounded-[1.75rem] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700 shadow-sm">
+                  {editPreviewError}
+                </div>
+              ) : null}
+
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="text-sm text-slate-500">Status</div>
@@ -501,37 +715,41 @@ export default function RouteDetailPage() {
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="text-sm text-slate-500">Dystans</div>
                   <div className="mt-3 text-2xl font-bold text-slate-950">
-                    {formatDistance(detail.route.total_distance_m)}
+                    {formatDistance(displayDistanceMeters)}
                   </div>
                 </div>
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="text-sm text-slate-500">Czas przejazdu</div>
                   <div className="mt-3 text-2xl font-bold text-slate-950">
-                    {formatDuration(detail.route.total_duration_s)}
+                    {formatDuration(displayDurationSeconds)}
                   </div>
                 </div>
               </div>
 
               <RouteMap
-                base={detail.mapBase}
-                stops={orderedStops.map((stop) => ({
-                  id: stop.id,
-                  lat: stop.reklamacje.lat,
-                  lon: stop.reklamacje.lon,
-                  nazwa_firmy: stop.reklamacje.nazwa_firmy,
-                  nazwa_mebla: stop.reklamacje.nazwa_mebla,
-                  imie_klienta: stop.reklamacje.imie_klienta,
-                  nazwisko_klienta: stop.reklamacje.nazwisko_klienta,
-                  telefon_klienta: stop.reklamacje.telefon_klienta,
-                  adres: stop.reklamacje.adres,
-                  miejscowosc: stop.reklamacje.miejscowosc,
-                  kod_pocztowy: stop.reklamacje.kod_pocztowy,
-                  order: stop.kolejnosc,
-                  status: stop.status,
-                  eta_from: stop.eta_from,
-                  eta_to: stop.eta_to,
-                }))}
-                encodedPolyline={detail.encodedPolyline}
+                base={isEditingRoute && editPreview?.settings ? editPreview.settings : detail.mapBase}
+                stops={displayStops.map((stop, index) => {
+                  const complaint = stop.reklamacje || stop;
+
+                  return {
+                    id: stop.id,
+                    lat: complaint.lat,
+                    lon: complaint.lon,
+                    nazwa_firmy: complaint.nazwa_firmy,
+                    nazwa_mebla: complaint.nazwa_mebla,
+                    imie_klienta: complaint.imie_klienta,
+                    nazwisko_klienta: complaint.nazwisko_klienta,
+                    telefon_klienta: complaint.telefon_klienta,
+                    adres: complaint.adres,
+                    miejscowosc: complaint.miejscowosc,
+                    kod_pocztowy: complaint.kod_pocztowy,
+                    order: stop.kolejnosc || index + 1,
+                    status: stop.status,
+                    eta_from: stop.eta_from,
+                    eta_to: stop.eta_to,
+                  };
+                })}
+                encodedPolyline={displayEncodedPolyline}
                 height="clamp(280px, 42vh, 540px)"
               />
 
@@ -551,6 +769,11 @@ export default function RouteDetailPage() {
 
                   {isEditingRoute ? (
                     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                      {editPreviewLoading ? (
+                        <div className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700">
+                          Przeliczanie ETA...
+                        </div>
+                      ) : null}
                       <input
                         type="datetime-local"
                         className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm sm:w-auto"
@@ -561,7 +784,13 @@ export default function RouteDetailPage() {
                         type="button"
                         className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={() => setRecalculateModalOpen(true)}
-                        disabled={saving || !routeEdited || !orderedIds.length}
+                        disabled={
+                          saving ||
+                          editPreviewLoading ||
+                          Boolean(editPreviewError) ||
+                          !routeEdited ||
+                          !orderedIds.length
+                        }
                       >
                         Zapisz zmiany trasy
                       </button>
@@ -571,21 +800,42 @@ export default function RouteDetailPage() {
 
                 <div className="mt-6">
                   <RouteStopsList
-                    stops={orderedStops}
+                    stops={displayStops}
                     routeBaseAddress={routeBaseAddress}
-                    plannedStartAt={detail.route.planowany_start_at}
-                    returnLegDurationSeconds={detail.returnLegDurationSeconds}
-                    returnEtaAt={detail.returnEtaAt}
-                    renderPhoneAccessory={(stop) => (
-                      <RouteSmsStatusControl
-                        status={stop.smsConfirmationStatus}
-                        disabled={saving || isEditingRoute}
-                        loading={saving}
-                        onChange={(nextStatus) =>
-                          handleSmsStatusChange(stop, nextStatus)
-                        }
-                      />
-                    )}
+                    plannedStartAt={
+                      isEditingRoute
+                        ? new Date(planowanyStartAt).toISOString()
+                        : detail.route.planowany_start_at
+                    }
+                    returnLegDurationSeconds={displayReturnLegDurationSeconds}
+                    returnEtaAt={displayReturnEtaAt}
+                    renderPhoneAccessory={(stop) =>
+                      isEditingRoute ? null : (
+                        <RouteSmsStatusControl
+                          status={stop.smsConfirmationStatus}
+                          disabled={saving}
+                          loading={saving}
+                          onChange={(nextStatus) =>
+                            handleSmsStatusChange(stop, nextStatus)
+                          }
+                        />
+                      )
+                    }
+                    renderTimingAccessory={(stop) =>
+                      isEditingRoute ? (
+                        <RouteStopDurationField
+                          value={currentStopPostojPayload[stop.reklamacja_id]}
+                          onChange={(event) =>
+                            handleStopPostojChange(
+                              stop.reklamacja_id,
+                              event.target.value
+                            )
+                          }
+                          disabled={saving}
+                          className="w-full sm:w-[220px]"
+                        />
+                      ) : null
+                    }
                     renderPointActions={(stop) => (
                       <>
                         {isEditingRoute ? (
@@ -691,10 +941,18 @@ export default function RouteDetailPage() {
                 <div className="mt-4 space-y-3 text-sm text-slate-700">
                   <div>Nazwa trasy: {detail.route.nazwa || "Brak nazwy wlasnej"}</div>
                   <div>Numer trasy: {detail.route.numer}</div>
-                  <div>Start: {formatDate(detail.route.planowany_start_at, true)}</div>
+                  <div>
+                    Start:{" "}
+                    {formatDate(
+                      isEditingRoute
+                        ? new Date(planowanyStartAt).toISOString()
+                        : detail.route.planowany_start_at,
+                      true
+                    )}
+                  </div>
                   <div>Baza: {routeBaseAddress}</div>
                   <div>Notatki: {detail.route.notes || "-"}</div>
-                  <div>Punkty: {detail.stops.length}</div>
+                  <div>Punkty: {displayStops.length}</div>
                   <div>
                     Ostatnia wysylka zbiorcza SMS:{" "}
                     {detail.route.smsConfirmationsSentAt

@@ -184,7 +184,7 @@ export default function DriverRoutePage() {
     }
   }
 
-  async function handleUndeliverConfirm() {
+  async function handleUndeliverConfirm(payload) {
     if (!undeliverTargetStop) {
       return;
     }
@@ -194,13 +194,15 @@ export default function DriverRoutePage() {
       setActionError(null);
       await apiFetch(`/api/trasy/${id}/stops/${undeliverTargetStop.id}/undeliver`, {
         method: "POST",
+        body: JSON.stringify(payload || {}),
       });
       setUndeliverTargetStopId(null);
       await refresh();
     } catch (err) {
       setActionError(
-        err.message || "Nie udalo sie oznaczyc punktu jako niedostarczony."
+        err.message || "Nie udalo sie oznaczyc punktu jako oczekujacego na dostawe."
       );
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -233,7 +235,7 @@ export default function DriverRoutePage() {
             href="/trasy/panel"
             className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
           >
-            Wroc do panelu
+            {"\u2B05\uFE0F Wroc do panelu"}
           </Link>
         }
         fullWidth
@@ -413,7 +415,7 @@ export default function DriverRoutePage() {
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center rounded-full border border-slate-950/80 bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-500"
                       >
-                        🧭 Prowadz do
+                        {"\uD83E\uDDED Prowadz do"}
                       </a>
 
                       {canStart ? (
@@ -423,7 +425,7 @@ export default function DriverRoutePage() {
                           onClick={handleStart}
                           disabled={saving}
                         >
-                          {saving ? "Uruchamianie..." : "Start trasy"}
+                          {saving ? "Uruchamianie..." : "\uD83D\uDE9A Start trasy"}
                         </button>
                       ) : null}
 
@@ -435,15 +437,15 @@ export default function DriverRoutePage() {
                             onClick={() => setDeliverTargetStopId(nextStop.id)}
                             disabled={saving}
                           >
-                            📦 Dostarczony
+                            {"\u2705 Zako\u0144cz"}
                           </button>
                           <button
                             type="button"
-                            className="rounded-full border border-slate-950/80 bg-rose-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-full border border-slate-950/80 bg-fuchsia-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-fuchsia-600 disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() => setUndeliverTargetStopId(nextStop.id)}
                             disabled={saving}
                           >
-                            ⚠️ Niedostarczony
+                            {"\u23F3 Oczekuje na dostaw\u0119"}
                           </button>
                         </>
                       ) : null}
@@ -465,7 +467,7 @@ export default function DriverRoutePage() {
                       onClick={handleComplete}
                       disabled={saving}
                     >
-                      {saving ? "Zamykanie..." : "Zakoncz trase"}
+                      {saving ? "Zamykanie..." : "\uD83C\uDFC1 Zakoncz trase"}
                     </button>
                   </div>
                 ) : (
@@ -554,3 +556,4 @@ export default function DriverRoutePage() {
     </>
   );
 }
+

@@ -9,7 +9,12 @@ export default async function handler(req, res) {
 
   try {
     const actor = await requireApiUser(req, { adminOnly: true });
-    const result = await undeliverRouteStop(req.query.id, req.query.stopId, actor);
+    const result = await undeliverRouteStop(
+      req.query.id,
+      req.query.stopId,
+      actor,
+      req.body || {}
+    );
     sendJson(res, 200, result);
   } catch (error) {
     sendError(res, error);

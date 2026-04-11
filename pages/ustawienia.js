@@ -30,6 +30,7 @@ const SAMPLE_SMS_VALUES = {
   link: "https://idz.do/abc123",
   telefon: "+48 123 456 789",
   nazwa_mebla: "Sofa Oslo",
+  adres: "63-600 Kepno Warszawska 12",
 };
 
 function settingsToForm(settings) {
@@ -355,7 +356,7 @@ export default function SettingsPage() {
                     Szablony sa zapisywane bez polskich znakow. Dostepne
                     placeholdery: <code>{"{{okno}}"}</code>,{" "}
                     <code>{"{{link}}"}</code>, <code>{"{{telefon}}"}</code>,{" "}
-                    <code>{"{{nazwa_mebla}}"}</code>.
+                    <code>{"{{nazwa_mebla}}"}</code>, <code>{"{{adres}}"}</code>.
                   </p>
                 </div>
                 <div className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">

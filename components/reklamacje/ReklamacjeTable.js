@@ -29,10 +29,34 @@ function AttachmentPreview({ reklamacja }) {
   );
 }
 
+function RemainingDays({ days, showBadge }) {
+  if (days == null) {
+    return "-";
+  }
+
+  if (!showBadge || days > 5) {
+    return `${days} dni`;
+  }
+
+  const isDue = days === 0;
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+        isDue
+          ? "bg-rose-100 text-rose-800 ring-1 ring-rose-200"
+          : "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+      }`}
+    >
+      {days} dni
+    </span>
+  );
+}
+
 export function ReklamacjeTable({
   reklamacje,
   showFirma = false,
   showRoute = true,
+  showRemainingBadge = false,
   onStatusClick,
   canRowAction,
   onRowAction,
@@ -104,7 +128,10 @@ export function ReklamacjeTable({
                     {formatDate(reklamacja.realizacja_do)}
                   </td>
                   <td className="px-4 py-4 text-slate-700">
-                    {remaining == null ? "-" : `${remaining} dni`}
+                    <RemainingDays
+                      days={remaining}
+                      showBadge={showRemainingBadge}
+                    />
                   </td>
                   <td className="px-4 py-4">
                     {onStatusClick ? (

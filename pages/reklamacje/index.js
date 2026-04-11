@@ -417,21 +417,22 @@ export default function ReklamacjeIndexPage() {
           {loadError ? (
             <ScreenState title="Blad ladowania" description={loadError} />
           ) : filtered.length ? (
-          <ReklamacjeTable
-            reklamacje={filtered}
-            showFirma={profile.role === ROLE.ADMIN}
-            onStatusClick={
-              profile.role === ROLE.ADMIN
-                ? (reklamacja) => setStatusModalComplaint(reklamacja)
-                : undefined
-            }
-            canRowAction={canAcceptComplaint}
-            onRowAction={handleAcceptComplaint}
-            rowActionBusyLabel="Przyjmowanie..."
-            rowActionLabel="Przyjmij"
-            rowActionLoadingId={acceptingComplaintId}
-          />
-        ) : (
+            <ReklamacjeTable
+              reklamacje={filtered}
+              showFirma={profile.role === ROLE.ADMIN}
+              showRemainingBadge={profile.role === ROLE.ADMIN}
+              onStatusClick={
+                profile.role === ROLE.ADMIN
+                  ? (reklamacja) => setStatusModalComplaint(reklamacja)
+                  : undefined
+              }
+              canRowAction={canAcceptComplaint}
+              onRowAction={handleAcceptComplaint}
+              rowActionBusyLabel="Przyjmowanie..."
+              rowActionLabel="Przyjmij"
+              rowActionLoadingId={acceptingComplaintId}
+            />
+          ) : (
             <ScreenState
               title="Brak reklamacji"
               description="Po dodaniu zgloszenia pojawi sie tutaj pelna karta ze szczegolami i historia zmian."

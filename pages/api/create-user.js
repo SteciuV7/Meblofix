@@ -17,6 +17,35 @@ function normalizeRole(value) {
   return ROLE.USER;
 }
 
+async function findAuthUserByEmail(supabase, email) {
+  let page = 1;
+
+  while (true) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const matchedUser = (data?.users || []).find(
+      (user) => normalizeEmail(user.email) === email
+    );
+
+    if (matchedUser) {
+      return matchedUser;
+    }
+
+    if (!data?.nextPage || page >= (data?.lastPage || page)) {
+      return null;
+    }
+
+    page = data.nextPage;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -36,48 +65,57 @@ export default async function handler(req, res) {
       });
     }
 
-    const { data: existingCompany, error: existingCompanyError } = await supabase
-      .from("firmy")
-      .select("firma_id")
-      .eq("email", normalizedEmail)
-      .maybeSingle();
+    let authUser = await findAuthUserByEmail(supabase, normalizedEmail);
 
-    if (existingCompanyError) {
-      return res.status(400).json({ error: existingCompanyError.message });
+    if (authUser) {
+      const { data, error } = await supabase.auth.admin.updateUserById(authUser.id, {
+        email_confirm: true,
+        password,
+        user_metadata: {
+          ...(authUser.user_metadata || {}),
+          companyName: normalizedCompanyName,
+          display_name: normalizedCompanyName,
+        },
+      });
+
+      if (error) {
+        return res.status(400).json({ error: error.message });
+      }
+
+      authUser = data?.user || authUser;
+    } else {
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: normalizedEmail,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          companyName: normalizedCompanyName,
+          display_name: normalizedCompanyName,
+        },
+      });
+
+      if (error) {
+        return res.status(400).json({ error: error.message });
+      }
+
+      authUser = data?.user;
+      if (!authUser?.id) {
+        return res.status(500).json({ error: "Nie utworzono uzytkownika w Auth." });
+      }
     }
 
-    if (existingCompany) {
-      return res.status(409).json({ error: "Ten e-mail jest juz zarejestrowany." });
-    }
-
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: normalizedEmail,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        companyName: normalizedCompanyName,
-        display_name: normalizedCompanyName,
-      },
-    });
-
-    if (error) {
-      return res.status(400).json({ error: error.message });
-    }
-
-    const authUser = data?.user;
-    if (!authUser?.id) {
-      return res.status(500).json({ error: "Nie utworzono uzytkownika w Auth." });
-    }
-
-    const { error: profileError } = await supabase.from("firmy").insert({
+    const profilePayload = {
       firma_id: authUser.id,
       email: normalizedEmail,
       nazwa_firmy: normalizedCompanyName,
       rola: normalizeRole(role),
-    });
+    };
+
+    const { error: profileError } = await supabase
+      .from("firmy")
+      .upsert(profilePayload, { onConflict: "firma_id" });
 
     if (profileError) {
-      await supabase.auth.admin.deleteUser(authUser.id);
       return res.status(400).json({ error: profileError.message });
     }
 

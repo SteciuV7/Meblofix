@@ -112,23 +112,6 @@ export default function Users() {
       return;
     }
 
-    const { data: existingUser, error: userCheckError } = await supabase
-      .from("firmy")
-      .select("email")
-      .filter("email", "eq", email)
-      .maybeSingle();
-
-    if (userCheckError) {
-      console.error("Blad pobierania uzytkownika:", userCheckError.message);
-      alert("Blad pobierania uzytkownika!");
-      return;
-    }
-
-    if (existingUser) {
-      alert("Ten e-mail jest juz zarejestrowany!");
-      return;
-    }
-
     const {
       data: { session },
     } = await supabase.auth.getSession();

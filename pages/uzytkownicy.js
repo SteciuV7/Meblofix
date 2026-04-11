@@ -105,14 +105,13 @@ export default function Users() {
     setRole("Użytkownik");
   };
   const addUser = async () => {
-    console.log("🟢 Funkcja addUser została wywołana!");
+    console.log("Dodawanie uzytkownika...");
 
     if (!email || !password || !companyName) {
-      alert("Proszę wypełnić wszystkie pola!");
+      alert("Prosze wypelnic wszystkie pola!");
       return;
     }
 
-    // Sprawdzenie, czy użytkownik już istnieje
     const { data: existingUser, error: userCheckError } = await supabase
       .from("firmy")
       .select("email")
@@ -120,41 +119,48 @@ export default function Users() {
       .maybeSingle();
 
     if (userCheckError) {
-      console.error("❌ Błąd pobierania użytkownika:", userCheckError.message);
-      alert("Błąd pobierania użytkownika!");
+      console.error("Blad pobierania uzytkownika:", userCheckError.message);
+      alert("Blad pobierania uzytkownika!");
       return;
     }
 
     if (existingUser) {
-      alert("Ten e-mail już jest zarejestrowany!");
+      alert("Ten e-mail jest juz zarejestrowany!");
       return;
     }
 
-    console.log("➡️ Próba rejestracji użytkownika...");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    // Rejestracja w Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          companyName,
-          display_name: companyName, // To ustawia Display name użytkownika
-        },
+    const res = await fetch("/api/create-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {}),
       },
+      body: JSON.stringify({
+        email,
+        password,
+        companyName,
+        role,
+      }),
     });
 
-    if (error) {
-      console.error("❌ Błąd rejestracji użytkownika:", error.message);
-      alert(`Błąd dodawania użytkownika: ${error.message}`);
+    const result = await res.json();
+
+    if (!res.ok) {
+      console.error("Blad rejestracji uzytkownika:", result.error);
+      alert(`Blad dodawania uzytkownika: ${result.error}`);
       return;
     }
 
-    console.log("✅ Użytkownik zarejestrowany:", data);
+    console.log("Uzytkownik zarejestrowany:", result);
     closeModal();
     location.reload();
   };
-
   const deleteUser = async () => {
     if (!userToDelete) {
       console.log("❌ Brak użytkownika do usunięcia!");

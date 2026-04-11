@@ -239,8 +239,9 @@ export default function RouteMap({
     validStops,
   });
   const routePositions = polyline.length > 0 ? polyline : fallbackRoutePositions;
+  const isComplaintMapPopup = popupVariant === "complaint-map";
   const isComplaintPopup =
-    popupVariant === "complaint-candidate" || popupVariant === "complaint-map";
+    popupVariant === "complaint-candidate" || isComplaintMapPopup;
 
   return (
     <div
@@ -316,21 +317,21 @@ export default function RouteMap({
             >
               <Popup>
                 {isComplaintPopup ? (
-                  <div className="w-[320px] max-w-[80vw] space-y-3 text-sm">
+                  <div className="w-[260px] max-w-[calc(100vw-4rem)] space-y-1.5 text-xs leading-tight sm:w-[320px] sm:max-w-[80vw] sm:space-y-3 sm:text-sm sm:leading-normal">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Firma
                       </div>
-                      <div className="mt-1 font-semibold text-slate-950">
+                      <div className="mt-0.5 font-semibold text-slate-950 sm:mt-1">
                         {companyName}
                       </div>
                     </div>
 
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Status przesylki
+                        Status reklamacji
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-1 sm:mt-2">
                         {complaintStatus ? (
                           <StatusBadge value={complaintStatus} />
                         ) : (
@@ -343,7 +344,7 @@ export default function RouteMap({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Adres
                       </div>
-                      <div className="mt-1 text-slate-700">
+                      <div className="mt-0.5 text-slate-700 sm:mt-1">
                         {addressLabel || "-"}
                       </div>
                     </div>
@@ -352,7 +353,7 @@ export default function RouteMap({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Termin realizacji
                       </div>
-                      <div className="mt-1 text-slate-700">
+                      <div className="mt-0.5 text-slate-700 sm:mt-1">
                         {formatDate(complaint?.realizacja_do)}
                       </div>
                     </div>
@@ -361,25 +362,25 @@ export default function RouteMap({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Numer reklamacji
                       </div>
-                      <div className="mt-1 text-slate-700">
+                      <div className="mt-0.5 text-slate-700 sm:mt-1">
                         {complaintNumber}
                       </div>
                     </div>
 
-                    <div>
+                    <div className={isComplaintMapPopup ? "hidden sm:block" : ""}>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Nazwa mebla
                       </div>
-                      <div className="mt-1 text-slate-700">
+                      <div className="mt-0.5 text-slate-700 sm:mt-1">
                         {furnitureName}
                       </div>
                     </div>
 
-                    <div>
+                    <div className={isComplaintMapPopup ? "hidden sm:block" : ""}>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Opis
                       </div>
-                      <div className="mt-1 whitespace-pre-wrap text-slate-700">
+                      <div className="mt-0.5 whitespace-pre-wrap text-slate-700 sm:mt-1">
                         {description}
                       </div>
                     </div>
@@ -388,7 +389,7 @@ export default function RouteMap({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Element odebrany
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-1 sm:mt-2">
                         <PickedUpIndicator
                           checked={isElementPickedUp}
                           label={
@@ -402,16 +403,16 @@ export default function RouteMap({
 
                     {(onShowStopDetails || renderStopActions) ? (
                       <div
-                        className={`grid gap-2 ${
+                        className={`grid gap-1.5 [&_button]:w-full [&_button]:px-2 [&_button]:py-1.5 [&_button]:text-xs sm:gap-2 sm:[&_button]:px-4 sm:[&_button]:py-2 sm:[&_button]:text-sm ${
                           onShowStopDetails && renderStopActions
-                            ? "sm:grid-cols-2"
+                            ? "grid-cols-2"
                             : ""
                         }`}
                       >
                         {onShowStopDetails ? (
                           <button
                             type="button"
-                            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                            className="rounded-full bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 sm:px-4 sm:py-2 sm:text-sm"
                             onClick={() => onShowStopDetails(stop)}
                           >
                             Szczegoly

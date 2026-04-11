@@ -22,7 +22,7 @@ function AttachmentPreview({ reklamacja }) {
       ) : null}
       {reklamacja.zalacznik_zdjecia?.length ? (
         <div className="text-xs text-slate-500">
-          Zdjecia: {reklamacja.zalacznik_zdjecia.length}
+          Zdjęcia: {reklamacja.zalacznik_zdjecia.length}
         </div>
       ) : null}
     </div>
@@ -50,15 +50,15 @@ export function ReklamacjeTable({
               {showFirma ? <th className="px-4 py-3 font-medium">Firma</th> : null}
               <th className="px-4 py-3 font-medium">Numer reklamacji</th>
               <th className="px-4 py-3 font-medium">Nazwa mebla</th>
-              <th className="px-4 py-3 font-medium">Imie</th>
+              <th className="px-4 py-3 font-medium">Imię</th>
               <th className="px-4 py-3 font-medium">Nazwisko</th>
               <th className="px-4 py-3 font-medium">Telefon</th>
               <th className="px-4 py-3 font-medium">Miejsce</th>
               <th className="px-4 py-3 font-medium">Termin</th>
-              <th className="px-4 py-3 font-medium">Pozostalo</th>
+              <th className="px-4 py-3 font-medium">Pozostało</th>
               <th className="px-4 py-3 font-medium">Status</th>
               {showRoute ? <th className="px-4 py-3 font-medium">Trasa</th> : null}
-              <th className="px-4 py-3 font-medium">Zalaczniki</th>
+              <th className="px-4 py-3 font-medium">Załączniki</th>
               <th className="px-4 py-3 font-medium">Akcje</th>
             </tr>
           </thead>
@@ -112,7 +112,7 @@ export function ReklamacjeTable({
                         type="button"
                         onClick={() => onStatusClick(reklamacja)}
                         className="cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2"
-                        aria-label={`Zmien status reklamacji ${reklamacja.nr_reklamacji || reklamacja.id}`}
+                        aria-label={`Zmień status reklamacji ${reklamacja.nr_reklamacji || reklamacja.id}`}
                       >
                         <StatusBadge
                           value={reklamacja.status}
@@ -137,7 +137,7 @@ export function ReklamacjeTable({
                         href={`/reklamacje/${reklamacja.id}`}
                         className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
                       >
-                        Szczegoly
+                        Szczegóły
                       </Link>
                       {showRowAction ? (
                         <button

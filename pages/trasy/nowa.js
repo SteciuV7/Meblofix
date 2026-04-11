@@ -444,7 +444,7 @@ export default function NewRoutePage() {
                 className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400 focus:border-sky-500"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Opcjonalny komentarz dla kierowcy"
+                placeholder="Opcjonalny komentarz do trasy"
               />
             </label>
           </div>

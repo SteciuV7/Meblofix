@@ -105,8 +105,8 @@ export default function PublicSmsConfirmationPage() {
     <div className="min-h-screen bg-slate-950 px-4 py-8 text-slate-900">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl items-center justify-center">
         <div className="w-full rounded-[2.25rem] border border-white/10 bg-white p-6 shadow-2xl sm:p-8">
-          <div className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-400">
-            Meblofix
+          <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-400">
+            Serwis meblowy
           </div>
 
           {loading ? (

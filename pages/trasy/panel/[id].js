@@ -8,7 +8,6 @@ import { ScreenState } from "@/components/layout/ScreenState";
 import { StatusBadge } from "@/components/StatusBadge";
 import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
 import RouteStopsList from "@/components/trasy/RouteStopsList";
-import RouteUndeliverModal from "@/components/trasy/RouteUndeliverModal";
 import {
   ROLE,
   ROUTE_STATUS,
@@ -527,6 +526,7 @@ export default function DriverRoutePage() {
         isOpen={Boolean(deliverTargetStop)}
         mode="deliver"
         initialValue={{
+          informacje: deliverTargetStop?.reklamacje?.informacje || "",
           opis_przebiegu: deliverTargetStop?.reklamacje?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
             deliverTargetStop?.reklamacje?.zalacznik_pdf_zakonczenie || null,
@@ -542,16 +542,25 @@ export default function DriverRoutePage() {
         onSubmit={handleDeliverSubmit}
       />
 
-      <RouteUndeliverModal
+      <ComplaintCloseModal
         isOpen={Boolean(undeliverTargetStop)}
-        stop={undeliverTargetStop}
-        loading={saving}
+        mode="waitingDelivery"
+        initialValue={{
+          informacje: undeliverTargetStop?.reklamacje?.informacje || "",
+          opis_przebiegu:
+            undeliverTargetStop?.reklamacje?.opis_przebiegu || "",
+          zalacznik_pdf_zakonczenie:
+            undeliverTargetStop?.reklamacje?.zalacznik_pdf_zakonczenie || null,
+          zalacznik_zakonczenie: safeArray(
+            undeliverTargetStop?.reklamacje?.zalacznik_zakonczenie
+          ),
+        }}
         onClose={() => {
           if (!saving) {
             setUndeliverTargetStopId(null);
           }
         }}
-        onConfirm={handleUndeliverConfirm}
+        onSubmit={handleUndeliverConfirm}
       />
     </>
   );

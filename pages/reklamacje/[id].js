@@ -896,6 +896,7 @@ export default function ReklamacjaDetailPage() {
         isOpen={Boolean(closeModalMode && detail?.reklamacja)}
         mode={closeModalMode === "edit" ? "edit" : "close"}
         initialValue={{
+          informacje: detail?.reklamacja?.informacje || "",
           opis_przebiegu: detail?.reklamacja?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
             detail?.reklamacja?.zalacznik_pdf_zakonczenie || null,

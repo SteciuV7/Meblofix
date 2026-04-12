@@ -50,11 +50,11 @@ function getDisplayFile(asset, fallbackLabel) {
 }
 
 function hasCompletionContent({ description, pdfAsset, imageAssets }) {
-  return Boolean(
-    description.trim() ||
-      pdfAsset ||
-      imageAssets.some(Boolean)
-  );
+  return Boolean(description.trim() || pdfAsset || imageAssets.some(Boolean));
+}
+
+function completionContentRequired(mode) {
+  return mode !== "waitingDelivery";
 }
 
 function buildModeMeta(mode) {
@@ -76,6 +76,15 @@ function buildModeMeta(mode) {
     };
   }
 
+  if (mode === "waitingDelivery") {
+    return {
+      title: "Oczekuje na dostaw\u0119",
+      submitLabel: "Zapisz i ustaw status",
+      helperText:
+        "Mo\u017cesz dopisa\u0107 informacj\u0119 dla firmy oraz przygotowa\u0107 dane zako\u0144czenia. Reklamacja nie zostanie zamkni\u0119ta.",
+    };
+  }
+
   return {
     title: "Zako\u0144cz reklamacj\u0119",
     submitLabel: "Zako\u0144cz reklamacj\u0119",
@@ -91,6 +100,7 @@ export default function ComplaintCloseModal({
   onClose,
   onSubmit,
 }) {
+  const [informacje, setInformacje] = useState("");
   const [description, setDescription] = useState("");
   const [pdfAsset, setPdfAsset] = useState(null);
   const [imageAssets, setImageAssets] = useState(emptyImageSlots);
@@ -119,6 +129,7 @@ export default function ComplaintCloseModal({
     }
 
     setDescription(initialValue?.opis_przebiegu || "");
+    setInformacje(initialValue?.informacje || "");
     setPdfAsset(buildPdfAsset(initialValue?.zalacznik_pdf_zakonczenie || null));
     setImageAssets(buildImageAssets(initialImagePaths));
     setPdfError("");
@@ -128,6 +139,7 @@ export default function ComplaintCloseModal({
   }, [
     initialImagePaths,
     initialImagesKey,
+    initialValue?.informacje,
     initialValue?.opis_przebiegu,
     initialValue?.zalacznik_pdf_zakonczenie,
     isOpen,
@@ -258,7 +270,10 @@ export default function ComplaintCloseModal({
   }
 
   async function handleSubmit() {
-    if (!hasCompletionContent({ description, pdfAsset, imageAssets })) {
+    if (
+      completionContentRequired(mode) &&
+      !hasCompletionContent({ description, pdfAsset, imageAssets })
+    ) {
       setSubmitError(
         "Dodaj opis przebiegu albo przynajmniej jeden za\u0142\u0105cznik."
       );
@@ -295,6 +310,7 @@ export default function ComplaintCloseModal({
       ).filter(Boolean);
 
       await onSubmit({
+        informacje: informacje.trim(),
         opis_przebiegu: description.trim(),
         zalacznik_pdf_zakonczenie: pdfPath,
         zalacznik_zakonczenie: imagePaths,
@@ -310,6 +326,8 @@ export default function ComplaintCloseModal({
 
   const closeDisabled = submitting;
   const selectedImagesCount = imageAssets.filter(Boolean).length;
+  const showInformacjeField =
+    mode === "waitingDelivery" || Boolean(initialValue?.informacje);
 
   return (
     <>
@@ -349,11 +367,33 @@ export default function ComplaintCloseModal({
             </div>
 
             <div className="mt-6 grid gap-6">
+              {showInformacjeField ? (
+                <label className="block text-sm font-medium text-slate-800">
+                  {"Informacje od Meblofix"}
+                  <textarea
+                    className="mt-2 min-h-28 w-full rounded-[1.5rem] border border-slate-200 px-4 py-3 text-slate-900 outline-none focus:border-sky-500"
+                    placeholder={"Opcjonalna informacja dla firmy zg\u0142aszaj\u0105cej"}
+                    value={informacje}
+                    onChange={(event) => {
+                      setInformacje(event.target.value);
+                      setSubmitError("");
+                    }}
+                  />
+                  <span className="mt-2 block text-xs text-slate-500">
+                    {"To pole pozostanie widoczne w szczeg\u00f3\u0142ach reklamacji."}
+                  </span>
+                </label>
+              ) : null}
+
               <label className="block text-sm font-medium text-slate-800">
                 {"Opis przebiegu reklamacji"}
                 <textarea
                   className="mt-2 min-h-36 w-full rounded-[1.5rem] border border-slate-200 px-4 py-3 text-slate-900 outline-none focus:border-sky-500"
-                  placeholder={"Opisz przebieg reklamacji"}
+                  placeholder={
+                    mode === "waitingDelivery"
+                      ? "Opcjonalny opis do pozniejszego zakonczenia"
+                      : "Opisz przebieg reklamacji"
+                  }
                   value={description}
                   onChange={(event) => {
                     setDescription(event.target.value);

@@ -6,9 +6,11 @@ import {
   ensureComplaintManualStatusChangeAllowed,
   getReklamacjaDetail,
   manuallyChangeComplaintStatus,
+  normalizeComplaintInfoPatch,
   setComplaintPickedUp,
   transitionComplaintStatus,
   validateComplaintClosePayload,
+  validateOptionalComplaintClosePayload,
 } from "@/lib/server/reklamacje";
 
 function requireAdmin(actor) {
@@ -46,11 +48,18 @@ export default async function handler(req, res) {
       case "waiting-delivery": {
         requireAdmin(actor);
         await ensureComplaintManualStatusChangeAllowed({ reklamacjaId });
+        const waitingDeliveryPayload =
+          validateOptionalComplaintClosePayload(payload);
         const reklamacja = await transitionComplaintStatus({
           reklamacjaId,
           actor,
           nextStatus: REKLAMACJA_STATUS.WAITING_DELIVERY,
           action: "reklamacja_waiting_delivery",
+          patch: {
+            ...normalizeComplaintInfoPatch(payload),
+            ...waitingDeliveryPayload,
+            data_zakonczenia: null,
+          },
         });
         sendJson(res, 200, { reklamacja });
         return;
@@ -65,6 +74,7 @@ export default async function handler(req, res) {
           nextStatus: REKLAMACJA_STATUS.DONE,
           action: "reklamacja_closed_manual",
           patch: {
+            ...normalizeComplaintInfoPatch(payload),
             ...closePayload,
             data_zakonczenia: new Date().toISOString(),
           },
@@ -79,7 +89,10 @@ export default async function handler(req, res) {
           reklamacjaId,
           actor,
           action: "reklamacja_close_data_updated",
-          patch: closePayload,
+          patch: {
+            ...normalizeComplaintInfoPatch(payload),
+            ...closePayload,
+          },
         });
         sendJson(res, 200, { reklamacja });
         return;
@@ -91,6 +104,7 @@ export default async function handler(req, res) {
           actor,
           nextStatus: payload.status,
           closePayload: payload.closePayload,
+          waitingDeliveryPayload: payload.waitingDeliveryPayload,
         });
         sendJson(res, 200, { reklamacja });
         return;

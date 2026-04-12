@@ -970,6 +970,7 @@ export default function RouteDetailPage() {
         isOpen={Boolean(closeTargetStop)}
         mode="deliver"
         initialValue={{
+          informacje: closeTargetStop?.reklamacje?.informacje || "",
           opis_przebiegu: closeTargetStop?.reklamacje?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
             closeTargetStop?.reklamacje?.zalacznik_pdf_zakonczenie || null,

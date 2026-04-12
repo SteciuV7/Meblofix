@@ -57,10 +57,12 @@ export default function ComplaintStatusModal({
   const disabledTarget =
     MANUAL_REKLAMACJA_DISABLED_STATUSES.includes(selectedStatus);
   const unchanged = selectedStatus === reklamacja.status;
-  const submitLabel =
-    selectedStatus === REKLAMACJA_STATUS.DONE
-      ? "Przejdz do zakonczenia"
-      : "Zapisz status";
+  let submitLabel = "Zapisz status";
+  if (selectedStatus === REKLAMACJA_STATUS.DONE) {
+    submitLabel = "Przejdz do zakonczenia";
+  } else if (selectedStatus === REKLAMACJA_STATUS.WAITING_DELIVERY) {
+    submitLabel = "Uzupelnij dane";
+  }
 
   async function handleSubmit() {
     if (!selectedStatus || unchanged || disabledTarget) {
@@ -194,6 +196,12 @@ export default function ComplaintStatusModal({
                   <div>
                     Po wybraniu tego statusu otworzy sie formularz zakonczenia
                     reklamacji.
+                  </div>
+                ) : null}
+                {selectedStatus === REKLAMACJA_STATUS.WAITING_DELIVERY ? (
+                  <div>
+                    Po wybraniu tego statusu otworzy sie formularz informacji i
+                    danych do pozniejszego zakonczenia.
                   </div>
                 ) : null}
               </div>

@@ -59,6 +59,8 @@ export default function ReklamacjeIndexPage() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusModalComplaint, setStatusModalComplaint] = useState(null);
   const [closeModalComplaint, setCloseModalComplaint] = useState(null);
+  const [waitingDeliveryModalComplaint, setWaitingDeliveryModalComplaint] =
+    useState(null);
 
   useEffect(() => {
     if (error) {
@@ -152,6 +154,12 @@ export default function ReklamacjeIndexPage() {
       return;
     }
 
+    if (nextStatus === REKLAMACJA_STATUS.WAITING_DELIVERY) {
+      setWaitingDeliveryModalComplaint(statusModalComplaint);
+      setStatusModalComplaint(null);
+      return;
+    }
+
     setSavingStatus(true);
 
     try {
@@ -191,6 +199,33 @@ export default function ReklamacjeIndexPage() {
       });
       await refreshReklamacje();
       setCloseModalComplaint(null);
+    } catch (error) {
+      throw error;
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
+  async function handleWaitingDeliverySubmit(payload) {
+    if (!waitingDeliveryModalComplaint) {
+      return;
+    }
+
+    setSavingStatus(true);
+
+    try {
+      await apiFetch(`/api/reklamacje/${waitingDeliveryModalComplaint.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "manual-status-change",
+          payload: {
+            status: REKLAMACJA_STATUS.WAITING_DELIVERY,
+            waitingDeliveryPayload: payload,
+          },
+        }),
+      });
+      await refreshReklamacje();
+      setWaitingDeliveryModalComplaint(null);
     } catch (error) {
       throw error;
     } finally {
@@ -469,6 +504,7 @@ export default function ReklamacjeIndexPage() {
         isOpen={Boolean(closeModalComplaint)}
         mode="close"
         initialValue={{
+          informacje: closeModalComplaint?.informacje || "",
           opis_przebiegu: closeModalComplaint?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
             closeModalComplaint?.zalacznik_pdf_zakonczenie || null,
@@ -484,6 +520,29 @@ export default function ReklamacjeIndexPage() {
           }
         }}
         onSubmit={handleCloseSubmit}
+      />
+
+      <ComplaintCloseModal
+        isOpen={Boolean(waitingDeliveryModalComplaint)}
+        mode="waitingDelivery"
+        initialValue={{
+          informacje: waitingDeliveryModalComplaint?.informacje || "",
+          opis_przebiegu:
+            waitingDeliveryModalComplaint?.opis_przebiegu || "",
+          zalacznik_pdf_zakonczenie:
+            waitingDeliveryModalComplaint?.zalacznik_pdf_zakonczenie || null,
+          zalacznik_zakonczenie: Array.isArray(
+            waitingDeliveryModalComplaint?.zalacznik_zakonczenie
+          )
+            ? waitingDeliveryModalComplaint.zalacznik_zakonczenie
+            : [],
+        }}
+        onClose={() => {
+          if (!savingStatus) {
+            setWaitingDeliveryModalComplaint(null);
+          }
+        }}
+        onSubmit={handleWaitingDeliverySubmit}
       />
     </>
   );

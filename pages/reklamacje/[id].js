@@ -6,6 +6,7 @@ import ComplaintAcceptModal from "@/components/reklamacje/ComplaintAcceptModal";
 import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
 import ImagePreviewModal from "@/components/reklamacje/ImagePreviewModal";
 import StoredImageTile from "@/components/reklamacje/StoredImageTile";
+import RouteSmsStatusControl from "@/components/trasy/RouteSmsStatusControl";
 import { storagePathToFileName } from "@/components/reklamacje/AttachmentDropzone";
 import {
   ACCEPTABLE_REKLAMACJA_STATUSES,
@@ -141,6 +142,9 @@ export default function ReklamacjaDetailPage() {
     detail?.reklamacja?.numer_faktury ||
     detail?.reklamacja?.nr_reklamacji ||
     "-";
+  const routeStopSmsStatus =
+    detail?.routeStop?.smsConfirmationStatus ||
+    detail?.routeStop?.sms_potwierdzenie_status;
   const showAdminSections = profile?.role === ROLE.ADMIN;
   const showAcknowledgeSection =
     profile?.role !== ROLE.ADMIN &&
@@ -345,6 +349,17 @@ export default function ReklamacjaDetailPage() {
                       <div className="mt-1">
                         Termin: {formatDate(detail.reklamacja.realizacja_do, true)}
                       </div>
+                      {detail.routeStop ? (
+                        <div className="mt-3 border-t border-slate-200 pt-3">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Potwierdzenie SMS
+                          </div>
+                          <RouteSmsStatusControl
+                            status={routeStopSmsStatus}
+                            readOnly
+                          />
+                        </div>
+                      ) : null}
                     </div>
                     <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">

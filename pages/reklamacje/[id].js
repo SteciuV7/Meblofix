@@ -3,6 +3,7 @@ import PickedUpIndicator from "@/components/PickedUpIndicator";
 import { ScreenState } from "@/components/layout/ScreenState";
 import { StatusBadge } from "@/components/StatusBadge";
 import ComplaintAcceptModal from "@/components/reklamacje/ComplaintAcceptModal";
+import ComplaintChangesAcknowledgeModal from "@/components/reklamacje/ComplaintChangesAcknowledgeModal";
 import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
 import ImagePreviewModal from "@/components/reklamacje/ImagePreviewModal";
 import StoredImageTile from "@/components/reklamacje/StoredImageTile";
@@ -81,7 +82,8 @@ export default function ReklamacjaDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(null);
-  const [acknowledge, setAcknowledge] = useState(false);
+  const [changesModalDismissedForId, setChangesModalDismissedForId] =
+    useState(null);
   const [acceptModalOpen, setAcceptModalOpen] = useState(false);
   const [closeModalMode, setCloseModalMode] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -117,6 +119,10 @@ export default function ReklamacjaDetailPage() {
     };
   }, [profile, id]);
 
+  useEffect(() => {
+    setChangesModalDismissedForId(null);
+  }, [id]);
+
   const images = useMemo(
     () => safeArray(detail?.reklamacja?.zalacznik_zdjecia),
     [detail?.reklamacja?.zalacznik_zdjecia]
@@ -145,11 +151,17 @@ export default function ReklamacjaDetailPage() {
   const routeStopSmsStatus =
     detail?.routeStop?.smsConfirmationStatus ||
     detail?.routeStop?.sms_potwierdzenie_status;
+  const pendingUserChanges = detail?.pendingUserChanges || {
+    hasChanges: false,
+    events: [],
+  };
   const showAdminSections = profile?.role === ROLE.ADMIN;
-  const showAcknowledgeSection =
+  const showChangesAcknowledgeModal =
     profile?.role !== ROLE.ADMIN &&
-    detail?.reklamacja?.nieprzeczytane_dla_uzytkownika;
-  const hasAsideContent = showAdminSections || showAcknowledgeSection;
+    detail?.reklamacja?.nieprzeczytane_dla_uzytkownika &&
+    pendingUserChanges.hasChanges &&
+    changesModalDismissedForId !== detail?.reklamacja?.id;
+  const hasAsideContent = showAdminSections;
 
   async function refresh() {
     const response = await apiFetch(`/api/reklamacje/${id}`);
@@ -225,13 +237,17 @@ export default function ReklamacjaDetailPage() {
       await apiFetch(`/api/reklamacje/${id}/acknowledge`, {
         method: "POST",
       });
-      setAcknowledge(false);
+      setChangesModalDismissedForId(detail?.reklamacja?.id || id);
       await refresh();
     } catch (err) {
       alert(err.message || "Nie udalo sie potwierdzic odczytu.");
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleDismissChangesModal() {
+    setChangesModalDismissedForId(detail?.reklamacja?.id || id);
   }
 
   async function handleAcceptSubmit(payload) {
@@ -878,29 +894,6 @@ export default function ReklamacjaDetailPage() {
                   </>
                 ) : null}
 
-                {showAcknowledgeSection ? (
-                <DetailCard title="Potwierdzenie zapoznania">
-                  <label className="flex items-start gap-3 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={acknowledge}
-                      onChange={(event) => setAcknowledge(event.target.checked)}
-                    />
-                    <span>
-                      Potwierdzam zapoznanie sie z reklamacja i ostatnimi zmianami.
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    className="mt-5 rounded-full bg-amber-600 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={handleAcknowledge}
-                    disabled={!acknowledge || saving}
-                  >
-                    Potwierdz odczyt
-                  </button>
-                </DetailCard>
-                ) : null}
               </aside>
             ) : null}
           </div>
@@ -936,6 +929,14 @@ export default function ReklamacjaDetailPage() {
           }
         }}
         onSubmit={handleAcceptSubmit}
+      />
+
+      <ComplaintChangesAcknowledgeModal
+        isOpen={showChangesAcknowledgeModal}
+        changes={pendingUserChanges}
+        loading={saving}
+        onClose={handleDismissChangesModal}
+        onConfirm={handleAcknowledge}
       />
 
       <ImagePreviewModal

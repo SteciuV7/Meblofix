@@ -314,6 +314,26 @@ export default function ReklamacjeIndexPage() {
     });
   }, [firma, reklamacje, search, status, terminDo, terminOd]);
 
+  const visibleReklamacje = useMemo(() => {
+    if (profile?.role === ROLE.ADMIN) {
+      return filtered;
+    }
+
+    return filtered
+      .map((reklamacja, index) => ({ reklamacja, index }))
+      .sort((left, right) => {
+        const leftUnread = left.reklamacja.nieprzeczytane_dla_uzytkownika
+          ? 1
+          : 0;
+        const rightUnread = right.reklamacja.nieprzeczytane_dla_uzytkownika
+          ? 1
+          : 0;
+
+        return rightUnread - leftUnread || left.index - right.index;
+      })
+      .map((item) => item.reklamacja);
+  }, [filtered, profile?.role]);
+
   const stats = useMemo(() => {
     const urgent = reklamacje.filter((item) => {
       const remaining = calculateRemainingDays(item.realizacja_do);
@@ -451,9 +471,10 @@ export default function ReklamacjeIndexPage() {
         <section className="mt-4">
           {loadError ? (
             <ScreenState title="Blad ladowania" description={loadError} />
-          ) : filtered.length ? (
+          ) : visibleReklamacje.length ? (
             <ReklamacjeTable
-              reklamacje={filtered}
+              reklamacje={visibleReklamacje}
+              highlightUnreadChanges={profile.role !== ROLE.ADMIN}
               showFirma={profile.role === ROLE.ADMIN}
               showRemainingBadge={profile.role === ROLE.ADMIN}
               onStatusClick={

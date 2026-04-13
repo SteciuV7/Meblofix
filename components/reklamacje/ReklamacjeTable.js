@@ -54,6 +54,7 @@ function RemainingDays({ days, showBadge }) {
 
 export function ReklamacjeTable({
   reklamacje,
+  highlightUnreadChanges = false,
   showFirma = false,
   showRoute = true,
   showRemainingBadge = false,
@@ -89,6 +90,9 @@ export function ReklamacjeTable({
           <tbody>
             {reklamacje.map((reklamacja) => {
               const remaining = calculateRemainingDays(reklamacja.realizacja_do);
+              const highlightUnread =
+                highlightUnreadChanges &&
+                reklamacja.nieprzeczytane_dla_uzytkownika;
               const showRowAction =
                 rowActionLabel &&
                 onRowAction &&
@@ -98,7 +102,12 @@ export function ReklamacjeTable({
               const rowActionLoading = rowActionLoadingId === reklamacja.id;
 
               return (
-                <tr key={reklamacja.id} className="border-t border-slate-200 align-top">
+                <tr
+                  key={reklamacja.id}
+                  className={`border-t border-slate-200 align-top ${
+                    highlightUnread ? "bg-amber-50" : ""
+                  }`}
+                >
                   <td className="px-4 py-4 font-medium text-slate-900">
                     {reklamacja.nr_reklamacji || "-"}
                   </td>

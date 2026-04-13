@@ -335,6 +335,12 @@ export default function ReklamacjeIndexPage() {
   }, [filtered, profile?.role]);
 
   const stats = useMemo(() => {
+    const active = reklamacje.filter(
+      (item) =>
+        item.status !== REKLAMACJA_STATUS.DONE &&
+        item.status !== REKLAMACJA_STATUS.ARCHIVE
+    ).length;
+
     const urgent = reklamacje.filter((item) => {
       const remaining = calculateRemainingDays(item.realizacja_do);
       return remaining != null && remaining <= 3;
@@ -348,7 +354,7 @@ export default function ReklamacjeIndexPage() {
       (item) => item.nieprzeczytane_dla_uzytkownika
     ).length;
 
-    return { urgent, planned, unread };
+    return { active, urgent, planned, unread };
   }, [reklamacje]);
 
   if (loading) {
@@ -385,7 +391,7 @@ export default function ReklamacjeIndexPage() {
         fullWidth
       >
         <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Aktywne" value={reklamacje.length} />
+          <StatCard label="Aktywne" value={stats.active} />
           <StatCard label="Pilne do 3 dni" value={stats.urgent} />
           <StatCard label="Zaplanowane na trase" value={stats.planned} />
           <StatCard label="Nieprzeczytane" value={stats.unread} />

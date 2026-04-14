@@ -79,6 +79,79 @@ function getValidPosition(lat, lon) {
   return [parsedLat, parsedLon];
 }
 
+function normalizeAddressKey(value = "") {
+  return String(value).trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getStopOverlapKey(stop) {
+  const complaint = stop?.reklamacje || stop || {};
+  const addressParts = [
+    complaint?.kod_pocztowy || stop?.kod_pocztowy,
+    complaint?.miejscowosc || stop?.miejscowosc,
+    complaint?.adres || stop?.adres,
+  ]
+    .filter(Boolean)
+    .map(normalizeAddressKey);
+  const addressKey = normalizeAddressKey(addressParts.join("|"));
+
+  if (addressKey) {
+    return `address:${addressKey}`;
+  }
+
+  const position = stop?._rawPosition || stop?._position || null;
+  if (!position) {
+    return null;
+  }
+
+  const [lat, lon] = position;
+  return `coord:${lat.toFixed(6)}:${lon.toFixed(6)}`;
+}
+
+function offsetPosition(position, overlapIndex, overlapCount) {
+  if (!position || !overlapCount || overlapCount <= 1) {
+    return position;
+  }
+
+  const [lat, lon] = position;
+  const angle = (Math.PI * 2 * overlapIndex) / overlapCount;
+  const radiusMeters = 20;
+  const latOffset = (radiusMeters * Math.sin(angle)) / 111320;
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+  const safeCosLat = Math.max(Math.abs(cosLat), 0.2);
+  const lonOffset = (radiusMeters * Math.cos(angle)) / (111320 * safeCosLat);
+
+  return [lat + latOffset, lon + lonOffset];
+}
+
+function withResolvedOverlaps(stops = []) {
+  const groupedIndexes = new Map();
+
+  stops.forEach((stop, index) => {
+    const key = getStopOverlapKey(stop);
+    if (!key) {
+      return;
+    }
+
+    const list = groupedIndexes.get(key) || [];
+    list.push(index);
+    groupedIndexes.set(key, list);
+  });
+
+  return stops.map((stop, index) => {
+    const key = getStopOverlapKey(stop);
+    const indexes = key ? groupedIndexes.get(key) || [] : [];
+    const overlapCount = indexes.length;
+    const overlapIndex = Math.max(indexes.indexOf(index), 0);
+
+    return {
+      ...stop,
+      _overlapCount: overlapCount,
+      _overlapIndex: overlapIndex,
+      _position: offsetPosition(stop._rawPosition, overlapIndex, overlapCount),
+    };
+  });
+}
+
 function resolveStopOrder(stop) {
   const rawOrder = stop?.order ?? stop?.kolejnosc ?? stop?.sequence ?? null;
   const parsed = Number(rawOrder);
@@ -138,7 +211,7 @@ function buildFallbackRoutePositions({ basePosition, validStops }) {
     return [];
   }
 
-  const positions = orderedStops.map((stop) => stop._position);
+  const positions = orderedStops.map((stop) => stop._rawPosition || stop._position);
 
   if (!basePosition) {
     return positions;
@@ -203,9 +276,9 @@ function buildMarkerIcon({ tone = "neutral", selected = false, label, isBase = f
         </div>
       </div>
     `,
-    iconSize: [40, 52],
-    iconAnchor: [20, 50],
-    popupAnchor: [0, -42],
+    iconSize: [32, 44],
+    iconAnchor: [16, 42],
+    popupAnchor: [0, -35],
   });
 }
 
@@ -220,13 +293,15 @@ export default function RouteMap({
   renderStopActions,
   singlePointMaxZoom = 9,
 }) {
-  const validStops = stops
-    .map((stop, index) => ({
-      ...stop,
-      _position: getValidPosition(stop?.lat, stop?.lon),
-      _key: stop.id || stop.reklamacja_id || index,
-    }))
-    .filter((stop) => stop._position);
+  const validStops = withResolvedOverlaps(
+    stops
+      .map((stop, index) => ({
+        ...stop,
+        _rawPosition: getValidPosition(stop?.lat, stop?.lon),
+        _key: stop.id || stop.reklamacja_id || index,
+      }))
+      .filter((stop) => stop._rawPosition)
+  );
   const basePosition = getValidPosition(base?.lat, base?.lon);
   const center = basePosition || validStops[0]?._position || [52.0693, 19.4803];
   const fitPositions = [

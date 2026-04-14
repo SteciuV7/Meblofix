@@ -131,7 +131,7 @@ export default async function handler(req, res) {
             actor.role === ROLE.ADMIN ? undefined : REKLAMACJA_STATUS.UPDATED,
           action: "reklamacja_updated",
           patch: nextPayload,
-          requireCustomerDataValidation: true,
+          requireCustomerDataValidation: actor.role !== ROLE.ADMIN,
         });
         sendJson(res, 200, { reklamacja });
       }

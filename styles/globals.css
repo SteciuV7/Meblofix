@@ -171,20 +171,20 @@ th {
 
 .route-pin {
   position: relative;
-  width: 2.5rem;
-  height: 3.25rem;
+  width: 2rem;
+  height: 2.75rem;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.28));
+  filter: drop-shadow(0 8px 14px rgba(15, 23, 42, 0.24));
 }
 
 .route-pin__inner {
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 1.9rem;
+  height: 1.9rem;
   border-radius: 9999px 9999px 9999px 0;
   transform: rotate(-45deg);
-  border: 3px solid rgba(255, 255, 255, 0.95);
+  border: 2.5px solid rgba(255, 255, 255, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -196,7 +196,7 @@ th {
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 800;
   line-height: 1;
 }
@@ -207,15 +207,15 @@ th {
 }
 
 .route-pin__dot {
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.45rem;
+  height: 0.45rem;
   border-radius: 9999px;
   background: currentColor;
 }
 
 .route-pin__house {
-  width: 1rem;
-  height: 1rem;
+  width: 0.85rem;
+  height: 0.85rem;
   display: block;
 }
 

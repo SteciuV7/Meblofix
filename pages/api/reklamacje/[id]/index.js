@@ -127,8 +127,7 @@ export default async function handler(req, res) {
         const reklamacja = await transitionComplaintStatus({
           reklamacjaId,
           actor,
-          nextStatus:
-            actor.role === ROLE.ADMIN ? undefined : REKLAMACJA_STATUS.UPDATED,
+          nextStatus: undefined,
           action: "reklamacja_updated",
           patch: nextPayload,
           requireCustomerDataValidation: actor.role !== ROLE.ADMIN,

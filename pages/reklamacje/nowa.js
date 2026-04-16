@@ -22,6 +22,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 const IMAGE_SLOT_COUNT = 4;
+const MAX_FURNITURE_NAME_LENGTH = 15;
 const RouteMap = dynamic(() => import("@/components/maps/RouteMap"), {
   ssr: false,
 });
@@ -280,6 +281,8 @@ export default function NewReklamacjaPage() {
     emptyImageSlots().map(() => "")
   );
   const [furnitureError, setFurnitureError] = useState("");
+  const [reporterInfoError, setReporterInfoError] = useState("");
+  const [deadlineError, setDeadlineError] = useState("");
   const [pdfError, setPdfError] = useState("");
   const [imageError, setImageError] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
@@ -449,8 +452,27 @@ export default function NewReklamacjaPage() {
   }
 
   function validateBeforeAddressPreview() {
-    if (!form.nazwa_mebla.trim()) {
+    const nazwaMebla = form.nazwa_mebla.trim();
+
+    if (!nazwaMebla) {
       setFurnitureError("Nazwa mebla jest wymagana.");
+      return false;
+    }
+
+    if (nazwaMebla.length > MAX_FURNITURE_NAME_LENGTH) {
+      setFurnitureError(
+        `Nazwa mebla moze miec maksymalnie ${MAX_FURNITURE_NAME_LENGTH} znakow.`
+      );
+      return false;
+    }
+
+    if (!form.informacje_od_zglaszajacego.trim()) {
+      setReporterInfoError("Informacje od zglaszajacego sa wymagane.");
+      return false;
+    }
+
+    if (!form.realizacja_do) {
+      setDeadlineError("Termin realizacji jest wymagany.");
       return false;
     }
 
@@ -460,6 +482,8 @@ export default function NewReklamacjaPage() {
     }
 
     setFurnitureError("");
+    setReporterInfoError("");
+    setDeadlineError("");
     setPdfError("");
     return true;
   }
@@ -500,6 +524,10 @@ export default function NewReklamacjaPage() {
 
   async function handleConfirmAddress() {
     if (!addressPreview) {
+      return;
+    }
+
+    if (!validateBeforeAddressPreview()) {
       return;
     }
 
@@ -619,19 +647,25 @@ export default function NewReklamacjaPage() {
               Nazwa mebla
               <input
                 required
+                maxLength={MAX_FURNITURE_NAME_LENGTH}
                 className={`mt-2 w-full rounded-2xl border px-4 py-3 ${
                   furnitureError ? "border-rose-300" : "border-slate-200"
                 }`}
                 value={form.nazwa_mebla}
                 placeholder="Nazwa mebla"
                 onChange={(event) => {
-                  if (event.target.value.trim()) {
+                  const nextValue = event.target.value.slice(
+                    0,
+                    MAX_FURNITURE_NAME_LENGTH
+                  );
+
+                  if (nextValue.trim()) {
                     setFurnitureError("");
                   }
 
                   setForm((current) => ({
                     ...current,
-                    nazwa_mebla: event.target.value,
+                    nazwa_mebla: nextValue,
                   }));
                 }}
                 onBlur={() => {
@@ -763,13 +797,19 @@ export default function NewReklamacjaPage() {
                 className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3"
                 value={form.informacje_od_zglaszajacego}
                 placeholder="Informacje od zgłaszającego"
-                onChange={(event) =>
+                onChange={(event) => {
+                  setReporterInfoError("");
                   setForm((current) => ({
                     ...current,
                     informacje_od_zglaszajacego: event.target.value,
-                  }))
-                }
+                  }));
+                }}
               />
+              {reporterInfoError ? (
+                <div className="mt-2 text-xs text-rose-600">
+                  {reporterInfoError}
+                </div>
+              ) : null}
             </label>
 
             <label className="block text-sm text-slate-700">
@@ -778,13 +818,17 @@ export default function NewReklamacjaPage() {
                 type="datetime-local"
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
                 value={form.realizacja_do}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setDeadlineError("");
                   setForm((current) => ({
                     ...current,
                     realizacja_do: event.target.value,
-                  }))
-                }
+                  }));
+                }}
               />
+              {deadlineError ? (
+                <div className="mt-2 text-xs text-rose-600">{deadlineError}</div>
+              ) : null}
             </label>
 
             <div className="md:col-span-2">
@@ -970,6 +1014,7 @@ export default function NewReklamacjaPage() {
                 <RouteMap
                   height="480px"
                   singlePointMaxZoom={15}
+                  showPickedUp={profile?.role === ROLE.ADMIN}
                   stops={[
                     {
                       id: "complaint-address-preview",

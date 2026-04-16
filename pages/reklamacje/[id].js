@@ -13,6 +13,7 @@ import {
   ACCEPTABLE_REKLAMACJA_STATUSES,
   REKLAMACJA_STATUS,
   ROLE,
+  SMS_CONFIRMATION_STATUS,
 } from "@/lib/constants";
 import { apiFetch } from "@/lib/client-api";
 import { getPublicStorageUrl } from "@/lib/storage";
@@ -31,6 +32,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
+
+const MAX_FURNITURE_NAME_LENGTH = 15;
 
 function buildEditState(detail) {
   return {
@@ -73,6 +76,11 @@ function DetailCard({ actions, children, title }) {
   );
 }
 
+const EMPTY_PENDING_USER_CHANGES = {
+  hasChanges: false,
+  events: [],
+};
+
 export default function ReklamacjaDetailPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -81,6 +89,9 @@ export default function ReklamacjaDetailPage() {
   const [editState, setEditState] = useState(buildEditState(null));
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editFurnitureError, setEditFurnitureError] = useState("");
+  const [editReporterInfoError, setEditReporterInfoError] = useState("");
+  const [editDeadlineError, setEditDeadlineError] = useState("");
   const [loadError, setLoadError] = useState(null);
   const [changesModalDismissedForId, setChangesModalDismissedForId] =
     useState(null);
@@ -151,15 +162,39 @@ export default function ReklamacjaDetailPage() {
   const routeStopSmsStatus =
     detail?.routeStop?.smsConfirmationStatus ||
     detail?.routeStop?.sms_potwierdzenie_status;
-  const pendingUserChanges = detail?.pendingUserChanges || {
-    hasChanges: false,
-    events: [],
-  };
+  const routeStopStatus = detail?.routeStop?.status || null;
+  const pendingUserChanges =
+    detail?.pendingUserChanges || EMPTY_PENDING_USER_CHANGES;
+  const userAddressEditBlocked =
+    profile?.role !== ROLE.ADMIN &&
+    (routeStopStatus === "in_progress" ||
+      (routeStopStatus === "planned" &&
+        routeStopSmsStatus === SMS_CONFIRMATION_STATUS.CONFIRMED));
+  const filteredPendingUserChanges = useMemo(() => {
+    if (profile?.role === ROLE.ADMIN) {
+      return pendingUserChanges;
+    }
+
+    const events = safeArray(pendingUserChanges?.events)
+      .map((event) => ({
+        ...event,
+        changes: safeArray(event?.changes).filter(
+          (change) => change?.fieldLabel !== "Element odebrany"
+        ),
+      }))
+      .filter((event) => event.changes.length > 0);
+
+    return {
+      ...pendingUserChanges,
+      hasChanges: events.length > 0,
+      events,
+    };
+  }, [pendingUserChanges, profile?.role]);
   const showAdminSections = profile?.role === ROLE.ADMIN;
   const showChangesAcknowledgeModal =
     profile?.role !== ROLE.ADMIN &&
     detail?.reklamacja?.nieprzeczytane_dla_uzytkownika &&
-    pendingUserChanges.hasChanges &&
+    filteredPendingUserChanges.hasChanges &&
     changesModalDismissedForId !== detail?.reklamacja?.id;
   const hasAsideContent = showAdminSections;
 
@@ -188,6 +223,39 @@ export default function ReklamacjaDetailPage() {
   }
 
   async function handleSave() {
+    const nazwaMebla = editState.nazwa_mebla.trim();
+    let hasErrors = false;
+
+    if (!nazwaMebla) {
+      setEditFurnitureError("Nazwa mebla jest wymagana.");
+      hasErrors = true;
+    } else if (nazwaMebla.length > MAX_FURNITURE_NAME_LENGTH) {
+      setEditFurnitureError(
+        `Nazwa mebla moze miec maksymalnie ${MAX_FURNITURE_NAME_LENGTH} znakow.`
+      );
+      hasErrors = true;
+    } else {
+      setEditFurnitureError("");
+    }
+
+    if (!editState.informacje_od_zglaszajacego.trim()) {
+      setEditReporterInfoError("Informacje od zglaszajacego sa wymagane.");
+      hasErrors = true;
+    } else {
+      setEditReporterInfoError("");
+    }
+
+    if (!editState.realizacja_do) {
+      setEditDeadlineError("Termin realizacji jest wymagany.");
+      hasErrors = true;
+    } else {
+      setEditDeadlineError("");
+    }
+
+    if (hasErrors) {
+      return;
+    }
+
     const success = await update("update", {
       ...editState,
       realizacja_do: editState.realizacja_do
@@ -224,10 +292,16 @@ export default function ReklamacjaDetailPage() {
   function handleToggleEditing() {
     if (isEditing) {
       setEditState(buildEditState(detail));
+      setEditFurnitureError("");
+      setEditReporterInfoError("");
+      setEditDeadlineError("");
       setIsEditing(false);
       return;
     }
 
+    setEditFurnitureError("");
+    setEditReporterInfoError("");
+    setEditDeadlineError("");
     setIsEditing(true);
   }
 
@@ -377,14 +451,14 @@ export default function ReklamacjaDetailPage() {
                         </div>
                       ) : null}
                     </div>
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Element odebrany
-                      </div>
-                      <div className="mt-2">
-                        <PickedUpIndicator checked={isElementPickedUp} />
-                      </div>
-                      {profile.role === ROLE.ADMIN ? (
+                    {profile.role === ROLE.ADMIN ? (
+                      <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Element odebrany
+                        </div>
+                        <div className="mt-2">
+                          <PickedUpIndicator checked={isElementPickedUp} />
+                        </div>
                         <button
                           type="button"
                           onClick={handleTogglePickedUp}
@@ -395,8 +469,8 @@ export default function ReklamacjaDetailPage() {
                             ? "Cofnij oznaczenie"
                             : "Oznacz jako odebrany"}
                         </button>
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -484,16 +558,33 @@ export default function ReklamacjaDetailPage() {
                     Nazwa mebla
                     <input
                       required
-                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
+                      maxLength={MAX_FURNITURE_NAME_LENGTH}
+                      className={`mt-2 w-full rounded-2xl border px-4 py-3 ${
+                        editFurnitureError ? "border-rose-300" : "border-slate-200"
+                      }`}
                       value={editState.nazwa_mebla}
                       placeholder="Nazwa mebla"
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const nextValue = event.target.value.slice(
+                          0,
+                          MAX_FURNITURE_NAME_LENGTH
+                        );
+
+                        if (nextValue.trim()) {
+                          setEditFurnitureError("");
+                        }
+
                         setEditState((current) => ({
                           ...current,
-                          nazwa_mebla: event.target.value,
-                        }))
-                      }
+                          nazwa_mebla: nextValue,
+                        }));
+                      }}
                     />
+                    {editFurnitureError ? (
+                      <div className="mt-2 text-xs text-rose-600">
+                        {editFurnitureError}
+                      </div>
+                    ) : null}
                   </label>
                   <label className="text-sm text-slate-700">
                     Imie klienta
@@ -543,13 +634,19 @@ export default function ReklamacjaDetailPage() {
                       type="datetime-local"
                       className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
                       value={editState.realizacja_do}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        setEditDeadlineError("");
                         setEditState((current) => ({
                           ...current,
                           realizacja_do: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
+                    {editDeadlineError ? (
+                      <div className="mt-2 text-xs text-rose-600">
+                        {editDeadlineError}
+                      </div>
+                    ) : null}
                   </label>
                   <label className="text-sm text-slate-700">
                     Kod pocztowy
@@ -557,6 +654,7 @@ export default function ReklamacjaDetailPage() {
                       className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
                       value={editState.kod_pocztowy}
                       placeholder="Kod pocztowy (XX-XXX)"
+                      disabled={userAddressEditBlocked}
                       onChange={(event) =>
                         setEditState((current) => ({
                           ...current,
@@ -571,6 +669,7 @@ export default function ReklamacjaDetailPage() {
                       className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
                       value={editState.miejscowosc}
                       placeholder="Miasto"
+                      disabled={userAddressEditBlocked}
                       onChange={(event) =>
                         setEditState((current) => ({
                           ...current,
@@ -585,6 +684,7 @@ export default function ReklamacjaDetailPage() {
                       className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
                       value={editState.adres}
                       placeholder="Nazwa ulicy + numer"
+                      disabled={userAddressEditBlocked}
                       onChange={(event) =>
                         setEditState((current) => ({
                           ...current,
@@ -592,6 +692,12 @@ export default function ReklamacjaDetailPage() {
                         }))
                       }
                     />
+                    {userAddressEditBlocked ? (
+                      <div className="mt-2 text-xs text-slate-500">
+                        Adres moze zmienic tylko admin, gdy punkt jest w trasie
+                        lub zaplanowany i potwierdzony.
+                      </div>
+                    ) : null}
                   </label>
                   <label className="text-sm text-slate-700 md:col-span-2">
                     Opis
@@ -613,13 +719,19 @@ export default function ReklamacjaDetailPage() {
                       className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3"
                       value={editState.informacje_od_zglaszajacego}
                       placeholder="Informacje od zglaszajacego"
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        setEditReporterInfoError("");
                         setEditState((current) => ({
                           ...current,
                           informacje_od_zglaszajacego: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
+                    {editReporterInfoError ? (
+                      <div className="mt-2 text-xs text-rose-600">
+                        {editReporterInfoError}
+                      </div>
+                    ) : null}
                   </label>
                   {profile.role === ROLE.ADMIN ? (
                     <label className="text-sm text-slate-700 md:col-span-2">
@@ -933,7 +1045,7 @@ export default function ReklamacjaDetailPage() {
 
       <ComplaintChangesAcknowledgeModal
         isOpen={showChangesAcknowledgeModal}
-        changes={pendingUserChanges}
+        changes={filteredPendingUserChanges}
         loading={saving}
         onClose={handleDismissChangesModal}
         onConfirm={handleAcknowledge}

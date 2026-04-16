@@ -238,6 +238,7 @@ export default function ComplaintMapPage() {
                 stops={filteredReklamacje}
                 popupVariant="complaint-map"
                 height="100%"
+                showPickedUp={profile.role === ROLE.ADMIN}
                 onShowStopDetails={(stop) =>
                   setPreviewComplaint(stop.reklamacje || stop)
                 }
@@ -292,6 +293,7 @@ export default function ComplaintMapPage() {
 
       <ComplaintPreviewModal
         complaint={previewComplaint}
+        showPickedUp={profile.role === ROLE.ADMIN}
         onClose={() => setPreviewComplaint(null)}
       />
     </>

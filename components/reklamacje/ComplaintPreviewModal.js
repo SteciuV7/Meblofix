@@ -21,7 +21,11 @@ function formatRemainingTimeLabel(targetDate) {
   return `${days} dni`;
 }
 
-export default function ComplaintPreviewModal({ complaint, onClose }) {
+export default function ComplaintPreviewModal({
+  complaint,
+  onClose,
+  showPickedUp = true,
+}) {
   const [previewImage, setPreviewImage] = useState(null);
 
   if (!complaint) {
@@ -62,14 +66,16 @@ export default function ComplaintPreviewModal({ complaint, onClose }) {
                 </h2>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {complaint.status ? <StatusBadge value={complaint.status} /> : null}
-                  <PickedUpIndicator
-                    checked={Boolean(complaint.element_odebrany)}
-                    label={
-                      complaint.element_odebrany
-                        ? "Element odebrany"
-                        : "Element nieodebrany"
-                    }
-                  />
+                  {showPickedUp ? (
+                    <PickedUpIndicator
+                      checked={Boolean(complaint.element_odebrany)}
+                      label={
+                        complaint.element_odebrany
+                          ? "Element odebrany"
+                          : "Element nieodebrany"
+                      }
+                    />
+                  ) : null}
                 </div>
               </div>
             </div>

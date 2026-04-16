@@ -554,14 +554,16 @@ export default function NewRoutePage() {
 
                               <div className="mt-4 flex flex-wrap items-center gap-2">
                                 <StatusBadge value={candidate.status} />
-                                <PickedUpIndicator
-                                  checked={Boolean(candidate.element_odebrany)}
-                                  label={
-                                    candidate.element_odebrany
-                                      ? "Element odebrany"
-                                      : "Element nieodebrany"
-                                  }
-                                />
+                                {profile?.role === ROLE.ADMIN ? (
+                                  <PickedUpIndicator
+                                    checked={Boolean(candidate.element_odebrany)}
+                                    label={
+                                      candidate.element_odebrany
+                                        ? "Element odebrany"
+                                        : "Element nieodebrany"
+                                    }
+                                  />
+                                ) : null}
                                 <Link
                                   href={`/reklamacje/${candidate.id}`}
                                   className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -626,6 +628,7 @@ export default function NewRoutePage() {
                     encodedPolyline={preview?.encodedPolyline}
                     height="clamp(320px, 60vh, 720px)"
                     popupVariant="complaint-candidate"
+                    showPickedUp={profile?.role === ROLE.ADMIN}
                     onShowStopDetails={(stop) =>
                       setPreviewComplaint(stop.reklamacje || stop)
                     }
@@ -897,6 +900,7 @@ export default function NewRoutePage() {
 
       <ComplaintPreviewModal
         complaint={previewComplaint}
+        showPickedUp={profile?.role === ROLE.ADMIN}
         onClose={() => setPreviewComplaint(null)}
       />
     </AppShell>

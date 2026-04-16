@@ -292,6 +292,7 @@ export default function RouteMap({
   popupVariant = "default",
   renderStopActions,
   singlePointMaxZoom = 9,
+  showPickedUp = true,
 }) {
   const validStops = withResolvedOverlaps(
     stops
@@ -460,21 +461,23 @@ export default function RouteMap({
                       </div>
                     </div>
 
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Element odebrany
+                    {showPickedUp ? (
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Element odebrany
+                        </div>
+                        <div className="mt-1 sm:mt-2">
+                          <PickedUpIndicator
+                            checked={isElementPickedUp}
+                            label={
+                              isElementPickedUp
+                                ? "Element odebrany"
+                                : "Element nieodebrany"
+                            }
+                          />
+                        </div>
                       </div>
-                      <div className="mt-1 sm:mt-2">
-                        <PickedUpIndicator
-                          checked={isElementPickedUp}
-                          label={
-                            isElementPickedUp
-                              ? "Element odebrany"
-                              : "Element nieodebrany"
-                          }
-                        />
-                      </div>
-                    </div>
+                    ) : null}
 
                     {(onShowStopDetails || renderStopActions) ? (
                       <div
@@ -533,14 +536,16 @@ export default function RouteMap({
                       {complaintStatus ? (
                         <StatusBadge value={complaintStatus} />
                       ) : null}
-                      <PickedUpIndicator
-                        checked={isElementPickedUp}
-                        label={
-                          isElementPickedUp
-                            ? "Element odebrany"
-                            : "Element nieodebrany"
-                        }
-                      />
+                      {showPickedUp ? (
+                        <PickedUpIndicator
+                          checked={isElementPickedUp}
+                          label={
+                            isElementPickedUp
+                              ? "Element odebrany"
+                              : "Element nieodebrany"
+                          }
+                        />
+                      ) : null}
                     </div>
 
                     <RouteEtaBadge etaFrom={stop.eta_from} etaTo={stop.eta_to} />

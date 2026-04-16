@@ -751,6 +751,7 @@ export default function RouteDetailPage() {
                 })}
                 encodedPolyline={displayEncodedPolyline}
                 height="clamp(280px, 42vh, 540px)"
+                showPickedUp={profile?.role === ROLE.ADMIN}
               />
 
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

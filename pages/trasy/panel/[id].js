@@ -500,6 +500,7 @@ export default function DriverRoutePage() {
                 }))}
                 encodedPolyline={detail.encodedPolyline}
                 height="clamp(300px, 42vh, 560px)"
+                showPickedUp={profile?.role === ROLE.ADMIN}
               />
             </section>
 

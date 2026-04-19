@@ -627,6 +627,7 @@ export default function NewRoutePage() {
                     stops={mapStops}
                     encodedPolyline={preview?.encodedPolyline}
                     height="clamp(320px, 60vh, 720px)"
+                    overlapMode="coordinates-first"
                     popupVariant="complaint-candidate"
                     showPickedUp={profile?.role === ROLE.ADMIN}
                     onShowStopDetails={(stop) =>

@@ -83,7 +83,7 @@ function normalizeAddressKey(value = "") {
   return String(value).trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function getStopOverlapKey(stop) {
+function getStopAddressOverlapKey(stop) {
   const complaint = stop?.reklamacje || stop || {};
   const addressParts = [
     complaint?.kod_pocztowy || stop?.kod_pocztowy,
@@ -98,6 +98,10 @@ function getStopOverlapKey(stop) {
     return `address:${addressKey}`;
   }
 
+  return null;
+}
+
+function getStopCoordinateOverlapKey(stop) {
   const position = stop?._rawPosition || stop?._position || null;
   if (!position) {
     return null;
@@ -105,6 +109,14 @@ function getStopOverlapKey(stop) {
 
   const [lat, lon] = position;
   return `coord:${lat.toFixed(6)}:${lon.toFixed(6)}`;
+}
+
+function getStopOverlapKey(stop, overlapMode = "address-first") {
+  if (overlapMode === "coordinates-first") {
+    return getStopCoordinateOverlapKey(stop) || getStopAddressOverlapKey(stop);
+  }
+
+  return getStopAddressOverlapKey(stop) || getStopCoordinateOverlapKey(stop);
 }
 
 function offsetPosition(position, overlapIndex, overlapCount) {
@@ -123,11 +135,11 @@ function offsetPosition(position, overlapIndex, overlapCount) {
   return [lat + latOffset, lon + lonOffset];
 }
 
-function withResolvedOverlaps(stops = []) {
+function withResolvedOverlaps(stops = [], overlapMode = "address-first") {
   const groupedIndexes = new Map();
 
   stops.forEach((stop, index) => {
-    const key = getStopOverlapKey(stop);
+    const key = getStopOverlapKey(stop, overlapMode);
     if (!key) {
       return;
     }
@@ -138,7 +150,7 @@ function withResolvedOverlaps(stops = []) {
   });
 
   return stops.map((stop, index) => {
-    const key = getStopOverlapKey(stop);
+    const key = getStopOverlapKey(stop, overlapMode);
     const indexes = key ? groupedIndexes.get(key) || [] : [];
     const overlapCount = indexes.length;
     const overlapIndex = Math.max(indexes.indexOf(index), 0);
@@ -293,6 +305,7 @@ export default function RouteMap({
   renderStopActions,
   singlePointMaxZoom = 9,
   showPickedUp = true,
+  overlapMode = "address-first",
 }) {
   const validStops = withResolvedOverlaps(
     stops
@@ -301,7 +314,8 @@ export default function RouteMap({
         _rawPosition: getValidPosition(stop?.lat, stop?.lon),
         _key: stop.id || stop.reklamacja_id || index,
       }))
-      .filter((stop) => stop._rawPosition)
+      .filter((stop) => stop._rawPosition),
+    overlapMode
   );
   const basePosition = getValidPosition(base?.lat, base?.lon);
   const center = basePosition || validStops[0]?._position || [52.0693, 19.4803];

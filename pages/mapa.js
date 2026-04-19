@@ -236,6 +236,7 @@ export default function ComplaintMapPage() {
               <RouteMap
                 className="h-full border-0 shadow-none"
                 stops={filteredReklamacje}
+                overlapMode="coordinates-first"
                 popupVariant="complaint-map"
                 height="100%"
                 showPickedUp={profile.role === ROLE.ADMIN}

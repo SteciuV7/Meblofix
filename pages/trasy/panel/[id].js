@@ -118,8 +118,14 @@ export default function DriverRoutePage() {
     [undeliverTargetStopId, orderedStops]
   );
 
-  const routeBaseAddress =
+  const routeStartBaseAddress =
+    detail?.mapStartBase?.adres_bazy ||
     detail?.mapBase?.adres_bazy ||
+    detail?.route?.base_address_snapshot ||
+    "Brak adresu magazynu";
+  const routeReturnBaseAddress =
+    detail?.mapReturnBase?.adres_bazy ||
+    detail?.route?.return_base_address_snapshot ||
     detail?.route?.base_address_snapshot ||
     "Brak adresu magazynu";
   const canStart =
@@ -480,7 +486,7 @@ export default function DriverRoutePage() {
             <section className="space-y-4">
               <h2 className="text-xl font-semibold text-slate-950">Mapa</h2>
               <RouteMap
-                base={detail.mapBase}
+                base={detail.mapStartBase || detail.mapBase}
                 stops={orderedStops.map((stop) => ({
                   id: stop.id,
                   lat: stop.reklamacje.lat,
@@ -511,7 +517,8 @@ export default function DriverRoutePage() {
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
                 <RouteStopsList
                   stops={orderedStops}
-                  routeBaseAddress={routeBaseAddress}
+                  routeStartAddress={routeStartBaseAddress}
+                  routeReturnAddress={routeReturnBaseAddress}
                   plannedStartAt={detail.route.planowany_start_at}
                   returnLegDurationSeconds={detail.returnLegDurationSeconds}
                   returnEtaAt={detail.returnEtaAt}

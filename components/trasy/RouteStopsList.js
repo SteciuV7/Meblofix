@@ -20,6 +20,8 @@ function getComplaint(stop) {
 export default function RouteStopsList({
   stops = [],
   routeBaseAddress,
+  routeStartAddress,
+  routeReturnAddress,
   plannedStartAt,
   returnLegDurationSeconds,
   returnEtaAt,
@@ -28,6 +30,9 @@ export default function RouteStopsList({
   renderTimingAccessory,
   highlightedStopId = null,
 }) {
+  const startBaseAddress = routeStartAddress || routeBaseAddress;
+  const returnBaseAddress = routeReturnAddress || routeBaseAddress;
+
   if (!stops.length) {
     return (
       <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center text-sm text-slate-500">
@@ -39,8 +44,8 @@ export default function RouteStopsList({
   return (
     <div className="space-y-1">
       <RouteBaseCard
-        title="Start z magazynu"
-        address={routeBaseAddress}
+        title="Punkt startu trasy"
+        address={startBaseAddress}
         caption={
           plannedStartAt
             ? `Planowany start: ${formatDate(plannedStartAt, true)}`
@@ -51,7 +56,7 @@ export default function RouteStopsList({
       {stops[0]?.duration_from_prev_s != null ? (
         <RouteLegConnector
           durationSeconds={stops[0].duration_from_prev_s}
-          label="Dojazd z magazynu do punktu 1"
+          label="Dojazd z punktu startu do punktu 1"
         />
       ) : null}
 
@@ -172,7 +177,7 @@ export default function RouteStopsList({
       ) : null}
       <RouteBaseCard
         title="Powrot do magazynu"
-        address={routeBaseAddress}
+        address={returnBaseAddress}
         caption="Punkt koncowy trasy"
         etaFrom={returnEtaAt}
       />

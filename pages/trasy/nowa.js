@@ -358,14 +358,22 @@ export default function NewRoutePage() {
     [decoratedCandidates]
   );
 
-  const activeSettings = preview?.base || preview?.settings || operationalSettings;
-  const routeBaseAddress = activeSettings?.adres_bazy || "Brak aktywnej bazy";
+  const activeStartSettings =
+    preview?.startBase || preview?.base || preview?.settings || operationalSettings;
+  const activeReturnSettings =
+    preview?.returnBase || preview?.settings || operationalSettings || activeStartSettings;
+  const startBaseAddress =
+    selectedStartPointOverride?.address ||
+    activeStartSettings?.adres_bazy ||
+    "Brak aktywnej bazy";
+  const returnBaseAddress =
+    activeReturnSettings?.adres_bazy ||
+    operationalSettings?.adres_bazy ||
+    "Brak aktywnej bazy";
   const startBaseTitle = selectedStartPointOverride
     ? "Start niestandardowy"
     : "Start z magazynu";
-  const returnBaseTitle = selectedStartPointOverride
-    ? "Powrot do punktu startu"
-    : "Powrot do magazynu";
+  const returnBaseTitle = "Powrot do magazynu";
   const firstLegLabel = selectedStartPointOverride
     ? "Dojazd z punktu startu do punktu 1"
     : "Dojazd z magazynu do punktu 1";
@@ -509,7 +517,10 @@ export default function NewRoutePage() {
       1440,
       Math.max(
         1,
-        normalizeStopPostojMinutes(value, getDefaultStopPostojMinutes(activeSettings))
+        normalizeStopPostojMinutes(
+          value,
+          getDefaultStopPostojMinutes(operationalSettings)
+        )
       )
     );
 
@@ -861,14 +872,13 @@ export default function NewRoutePage() {
                     </div>
                   </div>
                   <div className="mt-3 inline-flex rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
-                    {selectedStartPointOverride ? "Punkt startu" : "Baza"}:{" "}
-                    {activeSettings?.adres_bazy || "Brak aktywnej konfiguracji"}
+                    Start: {startBaseAddress}
                   </div>
                 </div>
 
                 <div className="min-w-0 p-4">
                   <RouteMap
-                    base={activeSettings}
+                    base={activeStartSettings}
                     stops={mapStops}
                     encodedPolyline={preview?.encodedPolyline}
                     height="clamp(320px, 60vh, 720px)"
@@ -949,7 +959,7 @@ export default function NewRoutePage() {
                 <div className="mt-5 space-y-1">
                   <RouteBaseCard
                     title={startBaseTitle}
-                    address={routeBaseAddress}
+                    address={startBaseAddress}
                     caption={
                       planowanyStartAt
                         ? `Planowany start: ${formatDate(
@@ -1086,7 +1096,7 @@ export default function NewRoutePage() {
                   ) : null}
                   <RouteBaseCard
                     title={returnBaseTitle}
-                    address={routeBaseAddress}
+                    address={returnBaseAddress}
                     caption="Punkt koncowy trasy"
                     etaFrom={preview?.returnEtaAt}
                   />
@@ -1104,10 +1114,8 @@ export default function NewRoutePage() {
 
                 <div className="mt-5 space-y-3 text-sm text-slate-600">
                   <div>Nazwa trasy: {routeName.trim() || "Brak nazwy wlasnej"}</div>
-                  <div>
-                    {selectedStartPointOverride ? "Punkt startu" : "Baza"}:{" "}
-                    {activeSettings?.adres_bazy || "Brak aktywnej bazy"}
-                  </div>
+                  <div>Punkt startu: {startBaseAddress}</div>
+                  <div>Powrot: {returnBaseAddress}</div>
                   <div>Wybrane punkty: {selectedIds.length}</div>
                   <div>
                     Dystans:{" "}

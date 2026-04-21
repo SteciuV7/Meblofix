@@ -291,9 +291,22 @@ export default function RouteDetailPage() {
     !isEditingRoute &&
     pendingBatchConfirmationStopsCount > 0;
   const displayStops = isEditingRoute ? editingPreviewStops : orderedStops;
-  const routeBaseAddress =
-    (isEditingRoute ? editPreview?.settings?.adres_bazy : null) ||
+  const routeStartBaseAddress =
+    (isEditingRoute
+      ? editPreview?.startBase?.adres_bazy ||
+        editPreview?.base?.adres_bazy ||
+        editPreview?.settings?.adres_bazy
+      : null) ||
+    detail?.mapStartBase?.adres_bazy ||
     detail?.mapBase?.adres_bazy ||
+    detail?.route?.base_address_snapshot ||
+    "Brak adresu magazynu";
+  const routeReturnBaseAddress =
+    (isEditingRoute
+      ? editPreview?.returnBase?.adres_bazy || editPreview?.settings?.adres_bazy
+      : null) ||
+    detail?.mapReturnBase?.adres_bazy ||
+    detail?.route?.return_base_address_snapshot ||
     detail?.route?.base_address_snapshot ||
     "Brak adresu magazynu";
   const displayDistanceMeters =
@@ -727,7 +740,13 @@ export default function RouteDetailPage() {
               </div>
 
               <RouteMap
-                base={isEditingRoute && editPreview?.settings ? editPreview.settings : detail.mapBase}
+                base={
+                  isEditingRoute
+                    ? editPreview?.startBase ||
+                      editPreview?.base ||
+                      editPreview?.settings
+                    : detail.mapStartBase || detail.mapBase
+                }
                 stops={displayStops.map((stop, index) => {
                   const complaint = stop.reklamacje || stop;
 
@@ -802,7 +821,8 @@ export default function RouteDetailPage() {
                 <div className="mt-6">
                   <RouteStopsList
                     stops={displayStops}
-                    routeBaseAddress={routeBaseAddress}
+                    routeStartAddress={routeStartBaseAddress}
+                    routeReturnAddress={routeReturnBaseAddress}
                     plannedStartAt={
                       isEditingRoute
                         ? new Date(planowanyStartAt).toISOString()
@@ -951,7 +971,8 @@ export default function RouteDetailPage() {
                       true
                     )}
                   </div>
-                  <div>Baza: {routeBaseAddress}</div>
+                  <div>Punkt startu: {routeStartBaseAddress}</div>
+                  <div>Powrot: {routeReturnBaseAddress}</div>
                   <div>Notatki: {detail.route.notes || "-"}</div>
                   <div>Punkty: {displayStops.length}</div>
                   <div>

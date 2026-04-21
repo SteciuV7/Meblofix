@@ -25,7 +25,7 @@ import {
   normalizeText,
 } from "@/lib/utils";
 import Link from "next/link";
-import { PhoneCall } from "lucide-react";
+import { AlertTriangle, CheckCircle2, MapPin, PhoneCall, X } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
@@ -102,6 +102,32 @@ function normalizeStopPostojMinutes(value, fallbackMinutes) {
   return fallbackMinutes;
 }
 
+function emptyStartPointForm() {
+  return {
+    kod_pocztowy: "",
+    miejscowosc: "",
+    adres: "",
+  };
+}
+
+function formatAddressLabel(requestedAddress = {}) {
+  return [
+    requestedAddress.addressLine,
+    requestedAddress.postalCode,
+    requestedAddress.town,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function buildStartPointPayload(form = {}) {
+  return {
+    kod_pocztowy: `${form.kod_pocztowy ?? ""}`.trim(),
+    miejscowosc: `${form.miejscowosc ?? ""}`.trim(),
+    adres: `${form.adres ?? ""}`.trim(),
+  };
+}
+
 export default function NewRoutePage() {
   const router = useRouter();
   const { profile, loading, error } = useCurrentProfile();
@@ -119,6 +145,13 @@ export default function NewRoutePage() {
   const [manualOrder, setManualOrder] = useState(false);
   const [planowanyStartAt, setPlanowanyStartAt] = useState(nextMorningIsoLocal());
   const [previewComplaint, setPreviewComplaint] = useState(null);
+  const [useCustomStartPoint, setUseCustomStartPoint] = useState(false);
+  const [customStartPointForm, setCustomStartPointForm] = useState(
+    emptyStartPointForm()
+  );
+  const [customStartPointPreview, setCustomStartPointPreview] = useState(null);
+  const [previewingStartPoint, setPreviewingStartPoint] = useState(false);
+  const [customStartPointError, setCustomStartPointError] = useState("");
   const [czasyPostojuMinByReklamacjaId, setCzasyPostojuMinByReklamacjaId] =
     useState({});
 
@@ -172,6 +205,37 @@ export default function NewRoutePage() {
     );
   }, [czasyPostojuMinByReklamacjaId, operationalSettings, selectedIds]);
 
+  const selectedStartPointOverride = useMemo(() => {
+    if (
+      !useCustomStartPoint ||
+      !customStartPointPreview?.confirmed ||
+      !customStartPointPreview?.geocode
+    ) {
+      return null;
+    }
+
+    const formattedAddress =
+      customStartPointPreview.geocode.formattedAddress ||
+      formatAddressLabel(customStartPointPreview.requestedAddress);
+
+    return {
+      address: formattedAddress,
+      lat: customStartPointPreview.geocode.lat,
+      lon: customStartPointPreview.geocode.lon,
+      matchType: customStartPointPreview.geocode.matchType,
+    };
+  }, [customStartPointPreview, useCustomStartPoint]);
+
+  const isCustomStartPointConfirmOpen = Boolean(
+    customStartPointPreview?.geocode && !customStartPointPreview.confirmed
+  );
+
+  useEffect(() => {
+    if (isCustomStartPointConfirmOpen) {
+      setPreviewComplaint(null);
+    }
+  }, [isCustomStartPointConfirmOpen]);
+
   useEffect(() => {
     if (!selectedIds.length) {
       setPreview(null);
@@ -192,6 +256,7 @@ export default function NewRoutePage() {
             planowanyStartAt: new Date(planowanyStartAt).toISOString(),
             optimize: !manualOrder,
             czasyPostojuMinByReklamacjaId: selectedStopPostojPayload,
+            startPointOverride: selectedStartPointOverride,
           }),
         });
 
@@ -218,6 +283,7 @@ export default function NewRoutePage() {
     planowanyStartAt,
     selectedIds,
     selectedStopPostojPayload,
+    selectedStartPointOverride,
   ]);
 
   const selectedStops = useMemo(() => {
@@ -292,8 +358,17 @@ export default function NewRoutePage() {
     [decoratedCandidates]
   );
 
-  const activeSettings = preview?.settings || operationalSettings;
+  const activeSettings = preview?.base || preview?.settings || operationalSettings;
   const routeBaseAddress = activeSettings?.adres_bazy || "Brak aktywnej bazy";
+  const startBaseTitle = selectedStartPointOverride
+    ? "Start niestandardowy"
+    : "Start z magazynu";
+  const returnBaseTitle = selectedStartPointOverride
+    ? "Powrot do punktu startu"
+    : "Powrot do magazynu";
+  const firstLegLabel = selectedStartPointOverride
+    ? "Dojazd z punktu startu do punktu 1"
+    : "Dojazd z magazynu do punktu 1";
 
   async function handleCreateRoute() {
     try {
@@ -307,6 +382,7 @@ export default function NewRoutePage() {
           notes,
           optimize: !manualOrder,
           czasyPostojuMinByReklamacjaId: selectedStopPostojPayload,
+          startPointOverride: selectedStartPointOverride,
         }),
       });
       router.push(`/trasy/${response.routeId}`);
@@ -315,6 +391,56 @@ export default function NewRoutePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleCustomStartToggle(nextValue) {
+    setUseCustomStartPoint(nextValue);
+    setCustomStartPointError("");
+    if (!nextValue) {
+      setCustomStartPointPreview(null);
+    }
+  }
+
+  async function handlePreviewCustomStartPoint() {
+    const payload = buildStartPointPayload(customStartPointForm);
+
+    if (!payload.kod_pocztowy || !payload.miejscowosc || !payload.adres) {
+      setCustomStartPointError(
+        "Podaj kod pocztowy, miejscowosc i adres dla niestandardowego startu."
+      );
+      return;
+    }
+
+    try {
+      setPreviewComplaint(null);
+      setPreviewingStartPoint(true);
+      setCustomStartPointError("");
+      const previewResponse = await apiFetch("/api/trasy/start-point-preview", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setCustomStartPointPreview({
+        ...previewResponse,
+        confirmed: false,
+      });
+    } catch (err) {
+      setCustomStartPointError(
+        err.message || "Nie udalo sie sprawdzic punktu startu."
+      );
+    } finally {
+      setPreviewingStartPoint(false);
+    }
+  }
+
+  function handleConfirmCustomStartPoint() {
+    setCustomStartPointPreview((current) =>
+      current
+        ? {
+            ...current,
+            confirmed: true,
+          }
+        : current
+    );
   }
 
   function addCandidate(candidateId) {
@@ -362,6 +488,15 @@ export default function NewRoutePage() {
       const updated = [...sourceOrder];
       [updated[index], updated[nextIndex]] = [updated[nextIndex], updated[index]];
       return updated;
+    });
+  }
+
+  function handleDisableAutoOptimization() {
+    setPreviewError(null);
+    setManualOrder(true);
+    setSelectedIds((current) => {
+      const orderedIds = selectedStops.map((stop) => stop.id).filter(Boolean);
+      return orderedIds.length ? orderedIds : current;
     });
   }
 
@@ -447,6 +582,115 @@ export default function NewRoutePage() {
                 placeholder="Opcjonalny komentarz do trasy"
               />
             </label>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold text-slate-900">
+                  Jednorazowy punkt startu
+                </div>
+                <div className="mt-1 text-sm text-slate-600">
+                  Trasa moze wystartowac z innego miejsca niz magazyn. Ustawienie
+                  dotyczy tylko tej trasy.
+                </div>
+              </div>
+
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={useCustomStartPoint}
+                  onChange={(event) => handleCustomStartToggle(event.target.checked)}
+                />
+                Uzyj innego startu
+              </label>
+            </div>
+
+            {useCustomStartPoint ? (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <label className="text-sm text-slate-700">
+                    Kod pocztowy
+                    <input
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-sky-500"
+                      value={customStartPointForm.kod_pocztowy}
+                      onChange={(event) => {
+                        setCustomStartPointForm((current) => ({
+                          ...current,
+                          kod_pocztowy: event.target.value,
+                        }));
+                        setCustomStartPointPreview(null);
+                        setCustomStartPointError("");
+                      }}
+                      placeholder="63-600"
+                    />
+                  </label>
+
+                  <label className="text-sm text-slate-700">
+                    Miejscowosc
+                    <input
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-sky-500"
+                      value={customStartPointForm.miejscowosc}
+                      onChange={(event) => {
+                        setCustomStartPointForm((current) => ({
+                          ...current,
+                          miejscowosc: event.target.value,
+                        }));
+                        setCustomStartPointPreview(null);
+                        setCustomStartPointError("");
+                      }}
+                      placeholder="Kepno"
+                    />
+                  </label>
+
+                  <label className="text-sm text-slate-700">
+                    Adres
+                    <input
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-sky-500"
+                      value={customStartPointForm.adres}
+                      onChange={(event) => {
+                        setCustomStartPointForm((current) => ({
+                          ...current,
+                          adres: event.target.value,
+                        }));
+                        setCustomStartPointPreview(null);
+                        setCustomStartPointError("");
+                      }}
+                      placeholder="ul. Magazynowa 1"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handlePreviewCustomStartPoint}
+                    disabled={previewingStartPoint || saving}
+                  >
+                    {previewingStartPoint ? "Sprawdzanie..." : "Sprawdz punkt startu"}
+                  </button>
+
+                  {customStartPointPreview?.confirmed ? (
+                    <span className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-semibold text-emerald-700">
+                      Potwierdzony punkt startu
+                    </span>
+                  ) : null}
+                </div>
+
+                {selectedStartPointOverride ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    Start: {selectedStartPointOverride.address}
+                  </div>
+                ) : null}
+
+                {customStartPointError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {customStartPointError}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white text-slate-900 shadow-sm">
@@ -617,7 +861,8 @@ export default function NewRoutePage() {
                     </div>
                   </div>
                   <div className="mt-3 inline-flex rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
-                    Baza: {activeSettings?.adres_bazy || "Brak aktywnej konfiguracji"}
+                    {selectedStartPointOverride ? "Punkt startu" : "Baza"}:{" "}
+                    {activeSettings?.adres_bazy || "Brak aktywnej konfiguracji"}
                   </div>
                 </div>
 
@@ -631,7 +876,9 @@ export default function NewRoutePage() {
                     popupVariant="complaint-candidate"
                     showPickedUp={profile?.role === ROLE.ADMIN}
                     onShowStopDetails={(stop) =>
-                      setPreviewComplaint(stop.reklamacje || stop)
+                      !isCustomStartPointConfirmOpen
+                        ? setPreviewComplaint(stop.reklamacje || stop)
+                        : null
                     }
                     renderStopActions={(stop) => (
                       <button
@@ -669,17 +916,31 @@ export default function NewRoutePage() {
                     </span>
                   ) : null}
                   {manualOrder ? (
-                    <button
-                      type="button"
-                      className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-                      onClick={() => setManualOrder(false)}
-                    >
-                      Wlacz autooptymalizacje
-                    </button>
+                    <>
+                      <span className="rounded-full bg-slate-200 px-4 py-2 text-xs font-semibold text-slate-700">
+                        Tryb reczny kolejnosci
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                        onClick={() => setManualOrder(false)}
+                      >
+                        Wlacz autooptymalizacje
+                      </button>
+                    </>
                   ) : (
-                    <span className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-semibold text-emerald-700">
-                      Autooptymalizacja wlaczona
-                    </span>
+                    <>
+                      <span className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-semibold text-emerald-700">
+                        Autooptymalizacja wlaczona
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-full bg-amber-100 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+                        onClick={handleDisableAutoOptimization}
+                      >
+                        Wylacz autooptymalizacje
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -687,7 +948,7 @@ export default function NewRoutePage() {
               {selectedStops.length ? (
                 <div className="mt-5 space-y-1">
                   <RouteBaseCard
-                    title="Start z magazynu"
+                    title={startBaseTitle}
                     address={routeBaseAddress}
                     caption={
                       planowanyStartAt
@@ -701,7 +962,7 @@ export default function NewRoutePage() {
                   {selectedStops[0]?.duration_from_prev_s != null ? (
                     <RouteLegConnector
                       durationSeconds={selectedStops[0].duration_from_prev_s}
-                      label="Dojazd z magazynu do punktu 1"
+                      label={firstLegLabel}
                     />
                   ) : null}
 
@@ -824,7 +1085,7 @@ export default function NewRoutePage() {
                     />
                   ) : null}
                   <RouteBaseCard
-                    title="Powrot do magazynu"
+                    title={returnBaseTitle}
                     address={routeBaseAddress}
                     caption="Punkt koncowy trasy"
                     etaFrom={preview?.returnEtaAt}
@@ -843,7 +1104,10 @@ export default function NewRoutePage() {
 
                 <div className="mt-5 space-y-3 text-sm text-slate-600">
                   <div>Nazwa trasy: {routeName.trim() || "Brak nazwy wlasnej"}</div>
-                  <div>Baza: {activeSettings?.adres_bazy || "Brak aktywnej bazy"}</div>
+                  <div>
+                    {selectedStartPointOverride ? "Punkt startu" : "Baza"}:{" "}
+                    {activeSettings?.adres_bazy || "Brak aktywnej bazy"}
+                  </div>
                   <div>Wybrane punkty: {selectedIds.length}</div>
                   <div>
                     Dystans:{" "}
@@ -865,6 +1129,12 @@ export default function NewRoutePage() {
                   </div>
                 </div>
 
+                {useCustomStartPoint && !selectedStartPointOverride ? (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Aby utworzyc trase, potwierdz najpierw niestandardowy punkt startu.
+                  </div>
+                ) : null}
+
                 <button
                   type="button"
                   className="mt-6 w-full rounded-full bg-sky-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -874,7 +1144,8 @@ export default function NewRoutePage() {
                     previewLoading ||
                     !selectedIds.length ||
                     Boolean(previewError) ||
-                    !preview
+                    !preview ||
+                    (useCustomStartPoint && !selectedStartPointOverride)
                   }
                 >
                   {saving ? "Tworzenie..." : "Utworz trase"}
@@ -904,6 +1175,142 @@ export default function NewRoutePage() {
         showPickedUp={profile?.role === ROLE.ADMIN}
         onClose={() => setPreviewComplaint(null)}
       />
+
+      {isCustomStartPointConfirmOpen ? (
+        <div
+          className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm"
+          onClick={() => setCustomStartPointPreview(null)}
+        >
+          <div
+            className="relative my-auto w-full max-w-6xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl max-h-[calc(100vh-2rem)]"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Potwierdzenie punktu startu trasy"
+          >
+            <button
+              type="button"
+              className="absolute right-4 top-4 z-10 rounded-full bg-white/95 p-2 text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-white hover:text-slate-950"
+              onClick={() => setCustomStartPointPreview(null)}
+              aria-label="Zamknij podglad punktu startu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="grid gap-0 lg:grid-cols-[minmax(0,1.4fr),380px]">
+              <div className="bg-slate-50 p-4">
+                <RouteMap
+                  height="480px"
+                  singlePointMaxZoom={15}
+                  showPickedUp={profile?.role === ROLE.ADMIN}
+                  stops={[
+                    {
+                      id: "route-start-point-preview",
+                      lat: customStartPointPreview.geocode.lat,
+                      lon: customStartPointPreview.geocode.lon,
+                      nazwa_firmy:
+                        customStartPointPreview.geocode.matchType === "approximate"
+                          ? "Przyblizony punkt startu"
+                          : "Punkt startu trasy",
+                      miejscowosc: customStartPointPreview.requestedAddress?.town,
+                      adres: customStartPointPreview.geocode.formattedAddress,
+                      tone:
+                        customStartPointPreview.geocode.matchType === "approximate"
+                          ? "yellow"
+                          : "blue",
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className="border-t border-slate-200 p-6 lg:border-l lg:border-t-0">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 rounded-full p-2 ${
+                      customStartPointPreview.geocode.matchType === "approximate"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    {customStartPointPreview.geocode.matchType === "approximate" ? (
+                      <AlertTriangle className="h-5 w-5" />
+                    ) : (
+                      <CheckCircle2 className="h-5 w-5" />
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="text-xl font-semibold text-slate-950">
+                      {customStartPointPreview.geocode.matchType === "approximate"
+                        ? "Sprawdz przyblizony punkt startu"
+                        : "Potwierdz punkt startu"}
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {customStartPointPreview.geocode.matchType === "approximate"
+                        ? "Google wskazal punkt przyblizony. Potwierdz go tylko, jesli pinezka pokazuje poprawne miejsce."
+                        : "Adres punktu startu zostal odnaleziony dokladnie."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4 text-sm text-slate-700">
+                  <div className="rounded-[1.5rem] bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Wpisany adres
+                    </div>
+                    <div className="mt-2 flex items-start gap-2 text-slate-900">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <span>{formatAddressLabel(customStartPointPreview.requestedAddress)}</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.5rem] bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Znaleziony adres
+                    </div>
+                    <div className="mt-2 font-medium text-slate-900">
+                      {customStartPointPreview.geocode.formattedAddress}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Typ wyniku: {customStartPointPreview.geocode.locationType || "brak"}
+                    </div>
+                  </div>
+
+                  {customStartPointPreview.geocode.warnings?.length ? (
+                    <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                        Ostrzezenia dopasowania
+                      </div>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-900">
+                        {customStartPointPreview.geocode.warnings.map((warning) => (
+                          <li key={warning}>{warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-6 flex flex-col gap-3">
+                  <button
+                    type="button"
+                    className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    onClick={handleConfirmCustomStartPoint}
+                  >
+                    Uzyj tego punktu startu
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                    onClick={() => setCustomStartPointPreview(null)}
+                  >
+                    Wroc do edycji adresu
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

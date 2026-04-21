@@ -46,6 +46,7 @@ export default async function handler(req, res) {
       dryRun = false,
       optimize = true,
       czasyPostojuMinByReklamacjaId = {},
+      startPointOverride = null,
     } = req.body || {};
 
     if (!planowanyStartAt) {
@@ -58,6 +59,7 @@ export default async function handler(req, res) {
         planowanyStartAt,
         optimize,
         czasyPostojuMinByReklamacjaId,
+        startPointOverride,
       });
       sendJson(res, 200, preview);
       return;
@@ -71,6 +73,7 @@ export default async function handler(req, res) {
       actor,
       optimize,
       czasyPostojuMinByReklamacjaId,
+      startPointOverride,
     });
 
     sendJson(res, 201, result);

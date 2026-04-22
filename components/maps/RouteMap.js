@@ -76,6 +76,14 @@ function getValidPosition(lat, lon) {
     return null;
   }
 
+  if (parsedLat < -90 || parsedLat > 90) {
+    return null;
+  }
+
+  if (parsedLon < -180 || parsedLon > 180) {
+    return null;
+  }
+
   return [parsedLat, parsedLon];
 }
 

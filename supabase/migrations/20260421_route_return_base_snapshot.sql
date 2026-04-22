@@ -5,6 +5,48 @@ alter table if exists public.trasy
   add column if not exists return_base_lat_snapshot numeric,
   add column if not exists return_base_lon_snapshot numeric;
 
+with active_operational_settings as (
+  select
+    adres_bazy,
+    lat,
+    lon
+  from public.ustawienia_operacyjne
+  where aktywny = true
+  order by updated_at desc nulls last, created_at desc nulls last
+  limit 1
+)
+update public.trasy as t
+set
+  base_address_snapshot = coalesce(
+    nullif(btrim(t.base_address_snapshot), ''),
+    aos.adres_bazy
+  ),
+  base_lat_snapshot = coalesce(t.base_lat_snapshot, aos.lat),
+  base_lon_snapshot = coalesce(t.base_lon_snapshot, aos.lon),
+  return_base_address_snapshot = coalesce(
+    nullif(btrim(t.return_base_address_snapshot), ''),
+    nullif(btrim(t.base_address_snapshot), ''),
+    aos.adres_bazy
+  ),
+  return_base_lat_snapshot = coalesce(
+    t.return_base_lat_snapshot,
+    t.base_lat_snapshot,
+    aos.lat
+  ),
+  return_base_lon_snapshot = coalesce(
+    t.return_base_lon_snapshot,
+    t.base_lon_snapshot,
+    aos.lon
+  )
+from active_operational_settings as aos
+where
+  t.base_lat_snapshot is null
+  or t.base_lon_snapshot is null
+  or t.return_base_lat_snapshot is null
+  or t.return_base_lon_snapshot is null
+  or nullif(btrim(t.base_address_snapshot), '') is null
+  or nullif(btrim(t.return_base_address_snapshot), '') is null;
+
 create or replace function public.create_route_with_stops(
   p_route jsonb,
   p_stops jsonb,

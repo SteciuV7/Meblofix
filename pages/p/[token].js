@@ -156,6 +156,12 @@ export default function PublicSmsConfirmationPage() {
                 </div>
               ) : null}
 
+              {detail.confirmationBlockedReason && detail.status !== "confirmed" ? (
+                <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+                  {detail.confirmationBlockedReason}
+                </div>
+              ) : null}
+
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
@@ -167,7 +173,7 @@ export default function PublicSmsConfirmationPage() {
                     ? "Potwierdzanie..."
                     : detail.canConfirm
                       ? "Potwierdzam termin"
-                      : "Termin potwierdzony"}
+                      : "Potwierdzenie niedostepne"}
                 </button>
                 <button
                   type="button"

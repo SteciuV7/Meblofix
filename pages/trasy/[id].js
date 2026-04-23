@@ -836,6 +836,7 @@ export default function RouteDetailPage() {
                           status={stop.smsConfirmationStatus}
                           disabled={saving}
                           loading={saving}
+                          readOnly={detail.route.status !== ROUTE_STATUS.PLANNED}
                           onChange={(nextStatus) =>
                             handleSmsStatusChange(stop, nextStatus)
                           }

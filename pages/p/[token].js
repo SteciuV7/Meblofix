@@ -25,6 +25,7 @@ export default function PublicSmsConfirmationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [calling, setCalling] = useState(false);
 
   useEffect(() => {
@@ -79,6 +80,24 @@ export default function PublicSmsConfirmationPage() {
       setError(err.message || "Nie udalo sie potwierdzic terminu.");
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handleReject() {
+    try {
+      setRejecting(true);
+      const payload = await fetchJson(
+        `/api/public/sms-confirmations/${token}/reject`,
+        {
+          method: "POST",
+        }
+      );
+      setDetail(payload);
+      setError(null);
+    } catch (err) {
+      setError(err.message || "Nie udalo sie odrzucic terminu.");
+    } finally {
+      setRejecting(false);
     }
   }
 
@@ -150,24 +169,35 @@ export default function PublicSmsConfirmationPage() {
                 </div>
               </div>
 
-              {detail.status === "confirmed" ? (
+              {detail.isConfirmed ? (
                 <div className="rounded-[1.75rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
                   Termin zostal juz potwierdzony. Dziekujemy.
                 </div>
               ) : null}
 
-              {detail.confirmationBlockedReason && detail.status !== "confirmed" ? (
+              {detail.isRejected ? (
+                <div className="rounded-[1.75rem] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+                  Termin zostal odrzucony. Skontaktuj sie z nami telefonicznie,
+                  aby ustalic dogodny termin.
+                </div>
+              ) : null}
+
+              {detail.confirmationBlockedReason && !detail.isConfirmed ? (
                 <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
                   {detail.confirmationBlockedReason}
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={handleConfirm}
-                  disabled={confirming || !detail.canConfirm}
-                  className="flex-1 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={confirming || rejecting || !detail.canConfirm}
+                  className={`rounded-full px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    detail.isConfirmed
+                      ? "bg-emerald-700 ring-2 ring-emerald-200"
+                      : "bg-emerald-600 hover:bg-emerald-500"
+                  }`}
                 >
                   {confirming
                     ? "Potwierdzanie..."
@@ -177,17 +207,39 @@ export default function PublicSmsConfirmationPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={handleReject}
+                  disabled={rejecting || confirming || !detail.canReject}
+                  className={`rounded-full px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    detail.isRejected
+                      ? "bg-rose-700 ring-2 ring-rose-200"
+                      : "bg-rose-600 hover:bg-rose-500"
+                  }`}
+                >
+                  {rejecting
+                    ? "Odrzucanie..."
+                    : detail.canReject
+                      ? "Odmawiam terminu"
+                      : "Odmowa niedostepna"}
+                </button>
+                <button
+                  type="button"
                   onClick={handleCall}
                   disabled={calling || !detail.contactPhoneHref}
-                  className="flex-1 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {calling
                     ? "Laczenie..."
                     : detail.contactPhone
-                      ? `Zadzwon: ${detail.contactPhone}`
+                      ? "Skontaktuj sie z nami"
                       : "Brak numeru kontaktowego"}
                 </button>
               </div>
+
+              {detail.contactPhone ? (
+                <div className="text-center text-sm text-slate-500">
+                  Numer kontaktowy: {detail.contactPhone}
+                </div>
+              ) : null}
             </div>
           )}
         </div>

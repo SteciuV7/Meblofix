@@ -93,6 +93,9 @@ export function ReklamacjeTable({
               const highlightUnread =
                 highlightUnreadChanges &&
                 reklamacja.nieprzeczytane_dla_uzytkownika;
+              const highlightSmsRejection =
+                highlightUnreadChanges &&
+                reklamacja.hasPendingSmsRejectionAlert;
               const showRowAction =
                 rowActionLabel &&
                 onRowAction &&
@@ -105,7 +108,11 @@ export function ReklamacjeTable({
                 <tr
                   key={reklamacja.id}
                   className={`border-t border-slate-200 align-top ${
-                    highlightUnread ? "bg-amber-50" : ""
+                    highlightSmsRejection
+                      ? "bg-rose-100"
+                      : highlightUnread
+                        ? "bg-amber-50"
+                        : ""
                   }`}
                 >
                   <td className="px-4 py-4 font-medium text-slate-900">

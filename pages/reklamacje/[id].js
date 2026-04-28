@@ -6,6 +6,7 @@ import ComplaintAcceptModal from "@/components/reklamacje/ComplaintAcceptModal";
 import ComplaintChangesAcknowledgeModal from "@/components/reklamacje/ComplaintChangesAcknowledgeModal";
 import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
 import ImagePreviewModal from "@/components/reklamacje/ImagePreviewModal";
+import ComplaintSmsRejectionModal from "@/components/reklamacje/ComplaintSmsRejectionModal";
 import StoredImageTile from "@/components/reklamacje/StoredImageTile";
 import RouteSmsStatusControl from "@/components/trasy/RouteSmsStatusControl";
 import { storagePathToFileName } from "@/components/reklamacje/AttachmentDropzone";
@@ -95,6 +96,8 @@ export default function ReklamacjaDetailPage() {
   const [loadError, setLoadError] = useState(null);
   const [changesModalDismissedForId, setChangesModalDismissedForId] =
     useState(null);
+  const [acknowledgingSmsRejection, setAcknowledgingSmsRejection] =
+    useState(false);
   const [acceptModalOpen, setAcceptModalOpen] = useState(false);
   const [closeModalMode, setCloseModalMode] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -165,6 +168,12 @@ export default function ReklamacjaDetailPage() {
   const routeStopStatus = detail?.routeStop?.status || null;
   const pendingUserChanges =
     detail?.pendingUserChanges || EMPTY_PENDING_USER_CHANGES;
+  const pendingSmsRejectionAlert = detail?.pendingSmsRejectionAlert || {
+    hasAlert: false,
+    message: null,
+    eventDate: null,
+    logId: null,
+  };
   const userAddressEditBlocked =
     profile?.role !== ROLE.ADMIN &&
     (routeStopStatus === "in_progress" ||
@@ -191,10 +200,13 @@ export default function ReklamacjaDetailPage() {
     };
   }, [pendingUserChanges, profile?.role]);
   const showAdminSections = profile?.role === ROLE.ADMIN;
+  const showSmsRejectionAlert =
+    profile?.role !== ROLE.ADMIN && pendingSmsRejectionAlert.hasAlert;
   const showChangesAcknowledgeModal =
     profile?.role !== ROLE.ADMIN &&
     detail?.reklamacja?.nieprzeczytane_dla_uzytkownika &&
     filteredPendingUserChanges.hasChanges &&
+    !showSmsRejectionAlert &&
     changesModalDismissedForId !== detail?.reklamacja?.id;
   const hasAsideContent = showAdminSections;
 
@@ -322,6 +334,20 @@ export default function ReklamacjaDetailPage() {
 
   function handleDismissChangesModal() {
     setChangesModalDismissedForId(detail?.reklamacja?.id || id);
+  }
+
+  async function handleAcknowledgeSmsRejectionAlert() {
+    try {
+      setAcknowledgingSmsRejection(true);
+      await apiFetch(`/api/reklamacje/${id}/sms-rejection-acknowledge`, {
+        method: "POST",
+      });
+      await refresh();
+    } catch (err) {
+      alert(err.message || "Nie udalo sie potwierdzic informacji o odmowie.");
+    } finally {
+      setAcknowledgingSmsRejection(false);
+    }
   }
 
   async function handleAcceptSubmit(payload) {
@@ -1049,6 +1075,13 @@ export default function ReklamacjaDetailPage() {
         loading={saving}
         onClose={handleDismissChangesModal}
         onConfirm={handleAcknowledge}
+      />
+
+      <ComplaintSmsRejectionModal
+        isOpen={showSmsRejectionAlert}
+        message={pendingSmsRejectionAlert.message}
+        loading={acknowledgingSmsRejection}
+        onClose={handleAcknowledgeSmsRejectionAlert}
       />
 
       <ImagePreviewModal

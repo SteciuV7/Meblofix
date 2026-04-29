@@ -372,7 +372,7 @@ export default function RozliczeniaPage() {
                     <th className="w-14 px-3 py-2">
                       <span className="sr-only">Zaznacz</span>
                     </th>
-                    <th className="px-3 py-2">Termin</th>
+                    <th className="px-3 py-2">Data zakonczenia</th>
                     <th className="px-3 py-2">Numer faktury / reklamacji</th>
                     <th className="px-3 py-2">Nazwa mebla</th>
                   </tr>
@@ -399,10 +399,7 @@ export default function RozliczeniaPage() {
                         </td>
                         <td className="px-3 py-3 align-top text-slate-900">
                           <div className="font-semibold">
-                            {formatDate(complaint.realizacja_do)}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            Zakonczono: {formatDate(complaint.data_zakonczenia, true)}
+                            {formatDate(complaint.data_zakonczenia, true)}
                           </div>
                         </td>
                         <td className="px-3 py-3 align-top font-medium text-slate-900">

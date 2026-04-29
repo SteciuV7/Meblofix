@@ -309,8 +309,9 @@ export default function RozliczeniaPage() {
         </div>
 
         <div className="mt-3 text-sm text-slate-500">
-          Lista jest filtrowana po dacie zakonczenia reklamacji. PDF nie jest
-          zapisywany w bazie.
+          Lista jest filtrowana po dacie zakonczenia lub dostarczenia
+          reklamacji. Data realizacji pozostaje informacja podgladowa. PDF nie
+          jest zapisywany w bazie.
         </div>
 
         {downloadError ? (
@@ -372,7 +373,7 @@ export default function RozliczeniaPage() {
                     <th className="w-14 px-3 py-2">
                       <span className="sr-only">Zaznacz</span>
                     </th>
-                    <th className="px-3 py-2">Data zakonczenia</th>
+                    <th className="px-3 py-2">Data realizacji</th>
                     <th className="px-3 py-2">Numer faktury / reklamacji</th>
                     <th className="px-3 py-2">Nazwa mebla</th>
                   </tr>
@@ -399,6 +400,10 @@ export default function RozliczeniaPage() {
                         </td>
                         <td className="px-3 py-3 align-top text-slate-900">
                           <div className="font-semibold">
+                            {formatDate(complaint.realizacja_do)}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Dostarczono:{" "}
                             {formatDate(complaint.data_zakonczenia, true)}
                           </div>
                         </td>

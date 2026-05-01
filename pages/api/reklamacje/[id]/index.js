@@ -76,7 +76,8 @@ export default async function handler(req, res) {
           patch: {
             ...normalizeComplaintInfoPatch(payload),
             ...closePayload,
-            data_zakonczenia: new Date().toISOString(),
+            data_zakonczenia:
+              closePayload.data_zakonczenia || new Date().toISOString(),
           },
         });
         sendJson(res, 200, { reklamacja });

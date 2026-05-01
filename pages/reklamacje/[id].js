@@ -287,7 +287,10 @@ export default function ReklamacjaDetailPage() {
       await apiFetch(`/api/reklamacje/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          action: closeModalMode === "edit" ? "update-close-data" : "close",
+          action:
+            closeModalMode === "edit" || closeModalMode === "edit-date"
+              ? "update-close-data"
+              : "close",
           payload,
         }),
       });
@@ -852,19 +855,35 @@ export default function ReklamacjaDetailPage() {
               <DetailCard
                 title="Zakonczenie reklamacji"
                 actions={
-                  profile.role === ROLE.ADMIN && isEditing ? (
-                    <button
-                      type="button"
-                      className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() =>
-                        setCloseModalMode(complaintClosed || completionVisible ? "edit" : "close")
-                      }
-                      disabled={saving || manualStatusChangeBlocked}
-                    >
-                      {complaintClosed || completionVisible
-                        ? "Edytuj zakonczenie"
-                        : "Zakoncz reklamacje"}
-                    </button>
+                  profile.role === ROLE.ADMIN ? (
+                    <>
+                      {complaintClosed ? (
+                        <button
+                          type="button"
+                          className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => setCloseModalMode("edit-date")}
+                          disabled={saving}
+                        >
+                          Zmien date zakonczenia
+                        </button>
+                      ) : null}
+                      {isEditing ? (
+                        <button
+                          type="button"
+                          className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() =>
+                            setCloseModalMode(
+                              complaintClosed || completionVisible ? "edit" : "close"
+                            )
+                          }
+                          disabled={saving || manualStatusChangeBlocked}
+                        >
+                          {complaintClosed || completionVisible
+                            ? "Edytuj zakonczenie"
+                            : "Zakoncz reklamacje"}
+                        </button>
+                      ) : null}
+                    </>
                   ) : null
                 }
               >
@@ -1040,8 +1059,13 @@ export default function ReklamacjaDetailPage() {
 
       <ComplaintCloseModal
         isOpen={Boolean(closeModalMode && detail?.reklamacja)}
-        mode={closeModalMode === "edit" ? "edit" : "close"}
+        mode={
+          closeModalMode === "edit" || closeModalMode === "edit-date"
+            ? "edit"
+            : "close"
+        }
         initialValue={{
+          data_zakonczenia: detail?.reklamacja?.data_zakonczenia || null,
           informacje: detail?.reklamacja?.informacje || "",
           opis_przebiegu: detail?.reklamacja?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
@@ -1055,6 +1079,7 @@ export default function ReklamacjaDetailPage() {
           }
         }}
         onSubmit={handleCloseSubmit}
+        showCompletionDate={profile?.role === ROLE.ADMIN && closeModalMode !== null}
       />
 
       <ComplaintAcceptModal

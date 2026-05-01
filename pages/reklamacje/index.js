@@ -531,6 +531,7 @@ export default function ReklamacjeIndexPage() {
         isOpen={Boolean(closeModalComplaint)}
         mode="close"
         initialValue={{
+          data_zakonczenia: closeModalComplaint?.data_zakonczenia || null,
           informacje: closeModalComplaint?.informacje || "",
           opis_przebiegu: closeModalComplaint?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
@@ -547,6 +548,7 @@ export default function ReklamacjeIndexPage() {
           }
         }}
         onSubmit={handleCloseSubmit}
+        showCompletionDate={profile?.role === ROLE.ADMIN}
       />
 
       <ComplaintCloseModal

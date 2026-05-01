@@ -534,6 +534,8 @@ export default function DriverRoutePage() {
         isOpen={Boolean(deliverTargetStop)}
         mode="deliver"
         initialValue={{
+          data_zakonczenia:
+            deliverTargetStop?.reklamacje?.data_zakonczenia || null,
           informacje: deliverTargetStop?.reklamacje?.informacje || "",
           opis_przebiegu: deliverTargetStop?.reklamacje?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
@@ -548,6 +550,7 @@ export default function DriverRoutePage() {
           }
         }}
         onSubmit={handleDeliverSubmit}
+        showCompletionDate={profile?.role === ROLE.ADMIN}
       />
 
       <ComplaintCloseModal

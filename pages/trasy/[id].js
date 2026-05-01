@@ -993,6 +993,8 @@ export default function RouteDetailPage() {
         isOpen={Boolean(closeTargetStop)}
         mode="deliver"
         initialValue={{
+          data_zakonczenia:
+            closeTargetStop?.reklamacje?.data_zakonczenia || null,
           informacje: closeTargetStop?.reklamacje?.informacje || "",
           opis_przebiegu: closeTargetStop?.reklamacje?.opis_przebiegu || "",
           zalacznik_pdf_zakonczenie:
@@ -1007,6 +1009,7 @@ export default function RouteDetailPage() {
           }
         }}
         onSubmit={handleDeliverSubmit}
+        showCompletionDate={profile?.role === ROLE.ADMIN}
       />
 
       <RouteRecalculateModal

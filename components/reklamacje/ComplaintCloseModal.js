@@ -12,6 +12,23 @@ import { useEffect, useMemo, useState } from "react";
 
 const IMAGE_SLOT_COUNT = 4;
 
+function toDateTimeLocalValue(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(0, 16);
+}
+
+function getCurrentDateTimeLocalValue() {
+  return new Date().toISOString().slice(0, 16);
+}
+
 function emptyImageSlots() {
   return Array.from({ length: IMAGE_SLOT_COUNT }, () => null);
 }
@@ -99,9 +116,11 @@ export default function ComplaintCloseModal({
   mode = "close",
   onClose,
   onSubmit,
+  showCompletionDate = false,
 }) {
   const [informacje, setInformacje] = useState("");
   const [description, setDescription] = useState("");
+  const [completionDate, setCompletionDate] = useState("");
   const [pdfAsset, setPdfAsset] = useState(null);
   const [imageAssets, setImageAssets] = useState(emptyImageSlots);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
@@ -128,8 +147,17 @@ export default function ComplaintCloseModal({
       return;
     }
 
+    const initialCompletionDate =
+      mode === "edit"
+        ? toDateTimeLocalValue(initialValue?.data_zakonczenia)
+        : showCompletionDate
+          ? toDateTimeLocalValue(initialValue?.data_zakonczenia) ||
+            getCurrentDateTimeLocalValue()
+          : "";
+
     setDescription(initialValue?.opis_przebiegu || "");
     setInformacje(initialValue?.informacje || "");
+    setCompletionDate(initialCompletionDate);
     setPdfAsset(buildPdfAsset(initialValue?.zalacznik_pdf_zakonczenie || null));
     setImageAssets(buildImageAssets(initialImagePaths));
     setPdfError("");
@@ -139,10 +167,13 @@ export default function ComplaintCloseModal({
   }, [
     initialImagePaths,
     initialImagesKey,
+    initialValue?.data_zakonczenia,
     initialValue?.informacje,
     initialValue?.opis_przebiegu,
     initialValue?.zalacznik_pdf_zakonczenie,
     isOpen,
+    mode,
+    showCompletionDate,
   ]);
 
   useEffect(() => {
@@ -310,6 +341,11 @@ export default function ComplaintCloseModal({
       ).filter(Boolean);
 
       await onSubmit({
+        ...(showCompletionDate && completionDate
+          ? {
+              data_zakonczenia: new Date(completionDate).toISOString(),
+            }
+          : {}),
         informacje: informacje.trim(),
         opis_przebiegu: description.trim(),
         zalacznik_pdf_zakonczenie: pdfPath,
@@ -382,6 +418,21 @@ export default function ComplaintCloseModal({
                   <span className="mt-2 block text-xs text-slate-500">
                     {"To pole pozostanie widoczne w szczeg\u00f3\u0142ach reklamacji."}
                   </span>
+                </label>
+              ) : null}
+
+              {showCompletionDate ? (
+                <label className="block text-sm font-medium text-slate-800">
+                  {"Data zakonczenia"}
+                  <input
+                    type="datetime-local"
+                    className="mt-2 w-full rounded-[1.5rem] border border-slate-200 px-4 py-3 text-slate-900 outline-none focus:border-sky-500"
+                    value={completionDate}
+                    onChange={(event) => {
+                      setCompletionDate(event.target.value);
+                      setSubmitError("");
+                    }}
+                  />
                 </label>
               ) : null}
 

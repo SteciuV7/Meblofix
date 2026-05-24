@@ -8,14 +8,12 @@ import {
   RouteLegConnector,
 } from "@/components/trasy/RouteTiming";
 import {
+  formatRouteStopAddress,
   formatDate,
   getComplaintCustomerName,
   getPhoneHref,
+  getRouteStopComplaint,
 } from "@/lib/utils";
-
-function getComplaint(stop) {
-  return stop?.reklamacje || stop || {};
-}
 
 export default function RouteStopsList({
   stops = [],
@@ -61,7 +59,8 @@ export default function RouteStopsList({
       ) : null}
 
       {stops.map((stop, index) => {
-        const complaint = getComplaint(stop);
+        const complaint = getRouteStopComplaint(stop);
+        const address = formatRouteStopAddress(complaint);
         const customerName = getComplaintCustomerName(complaint);
         const customerPhoneHref = getPhoneHref(complaint.telefon_klienta);
         const pointActions = renderPointActions ? renderPointActions(stop, index) : null;
@@ -90,10 +89,7 @@ export default function RouteStopsList({
                     {complaint.nazwa_firmy || "Brak nazwy firmy"}
                   </div>
                   <div className="mt-1 text-sm text-slate-600">
-                    {complaint.kod_pocztowy ? `${complaint.kod_pocztowy} ` : ""}
-                    {complaint.miejscowosc}
-                    {complaint.miejscowosc || complaint.adres ? ", " : ""}
-                    {complaint.adres}
+                    {address || "-"}
                   </div>
                   {complaint.nazwa_mebla ? (
                     <div className="mt-2 text-sm text-slate-600">

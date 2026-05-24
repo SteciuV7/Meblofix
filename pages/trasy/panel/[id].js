@@ -20,8 +20,10 @@ import {
   formatDistance,
   formatDuration,
   formatEtaDate,
+  formatRouteStopAddress,
   getComplaintCustomerName,
   getPhoneHref,
+  getRouteStopComplaint,
   getRouteDisplayName,
   safeArray,
 } from "@/lib/utils";
@@ -31,7 +33,7 @@ const RouteMap = dynamic(() => import("@/components/maps/RouteMap"), {
 });
 
 function buildDirectionsHref(stop) {
-  const complaint = stop?.reklamacje || {};
+  const complaint = getRouteStopComplaint(stop);
   const lat = complaint.lat ?? stop?.lat;
   const lon = complaint.lon ?? stop?.lon;
 
@@ -41,13 +43,7 @@ function buildDirectionsHref(stop) {
     )}&travelmode=driving`;
   }
 
-  const destination = [
-    complaint.adres,
-    complaint.kod_pocztowy,
-    complaint.miejscowosc,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const destination = formatRouteStopAddress(complaint);
 
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
     destination
@@ -225,7 +221,8 @@ export default function DriverRoutePage() {
     return null;
   }
 
-  const nextComplaint = nextStop?.reklamacje || null;
+  const nextComplaint = nextStop ? getRouteStopComplaint(nextStop) : null;
+  const nextAddress = nextComplaint ? formatRouteStopAddress(nextComplaint) : "";
   const nextCustomerName = getComplaintCustomerName(nextComplaint);
   const nextCustomerPhoneHref = getPhoneHref(nextComplaint?.telefon_klienta);
 
@@ -314,12 +311,7 @@ export default function DriverRoutePage() {
                           {nextComplaint.nazwa_firmy}
                         </div>
                         <div className="mt-2 text-sm text-slate-600">
-                          {nextComplaint.kod_pocztowy
-                            ? `${nextComplaint.kod_pocztowy} `
-                            : ""}
-                          {nextComplaint.miejscowosc}
-                          {nextComplaint.miejscowosc || nextComplaint.adres ? ", " : ""}
-                          {nextComplaint.adres}
+                          {nextAddress || "-"}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -487,23 +479,27 @@ export default function DriverRoutePage() {
               <h2 className="text-xl font-semibold text-slate-950">Mapa</h2>
               <RouteMap
                 base={detail.mapStartBase || detail.mapBase}
-                stops={orderedStops.map((stop) => ({
-                  id: stop.id,
-                  lat: stop.reklamacje.lat,
-                  lon: stop.reklamacje.lon,
-                  nazwa_firmy: stop.reklamacje.nazwa_firmy,
-                  nazwa_mebla: stop.reklamacje.nazwa_mebla,
-                  imie_klienta: stop.reklamacje.imie_klienta,
-                  nazwisko_klienta: stop.reklamacje.nazwisko_klienta,
-                  telefon_klienta: stop.reklamacje.telefon_klienta,
-                  adres: stop.reklamacje.adres,
-                  miejscowosc: stop.reklamacje.miejscowosc,
-                  kod_pocztowy: stop.reklamacje.kod_pocztowy,
-                  order: stop.kolejnosc,
-                  status: stop.status,
-                  eta_from: stop.eta_from,
-                  eta_to: stop.eta_to,
-                }))}
+                stops={orderedStops.map((stop) => {
+                  const complaint = getRouteStopComplaint(stop);
+
+                  return {
+                    id: stop.id,
+                    lat: complaint.lat,
+                    lon: complaint.lon,
+                    nazwa_firmy: complaint.nazwa_firmy,
+                    nazwa_mebla: complaint.nazwa_mebla,
+                    imie_klienta: complaint.imie_klienta,
+                    nazwisko_klienta: complaint.nazwisko_klienta,
+                    telefon_klienta: complaint.telefon_klienta,
+                    adres: complaint.adres,
+                    miejscowosc: complaint.miejscowosc,
+                    kod_pocztowy: complaint.kod_pocztowy,
+                    order: stop.kolejnosc,
+                    status: stop.status,
+                    eta_from: stop.eta_from,
+                    eta_to: stop.eta_to,
+                  };
+                })}
                 encodedPolyline={detail.encodedPolyline}
                 height="clamp(300px, 42vh, 560px)"
                 showPickedUp={profile?.role === ROLE.ADMIN}

@@ -24,13 +24,14 @@ export default function RouteSmsStatusControl({
   disabled = false,
   loading = false,
   readOnly = false,
+  tooltipLabel = "",
   onChange,
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const activeStatus = status || SMS_CONFIRMATION_STATUS.NOT_SENT;
   const statusLabel = labelForStatus(activeStatus);
-  const controlLabel = `Kolor potwierdzenia SMS: ${statusLabel}`;
+  const controlLabel = tooltipLabel || `Kolor potwierdzenia SMS: ${statusLabel}`;
   const interactive = !readOnly && typeof onChange === "function";
   const content = (
     <>
@@ -60,7 +61,7 @@ export default function RouteSmsStatusControl({
 
   return (
     <div ref={containerRef} className="group relative inline-flex">
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden max-w-xs -translate-x-1/2 rounded-lg bg-slate-950 px-3 py-2 text-center text-xs font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
         {controlLabel}
       </div>
       {interactive ? (

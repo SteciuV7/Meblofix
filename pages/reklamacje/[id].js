@@ -20,14 +20,16 @@ import { apiFetch } from "@/lib/client-api";
 import { getPublicStorageUrl } from "@/lib/storage";
 import { useCurrentProfile } from "@/lib/use-current-profile";
 import {
+  cn,
   formatDate,
   formatDistance,
   formatDuration,
   formatEtaDate,
+  formatOperationalLogAction,
+  getOperationalLogTone,
   getComplaintCustomerName,
   getPhoneHref,
   getRouteDisplayName,
-  labelForOperationalAction,
   safeArray,
 } from "@/lib/utils";
 import Link from "next/link";
@@ -35,6 +37,16 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 const MAX_FURNITURE_NAME_LENGTH = 15;
+
+const OPERATIONAL_LOG_ROW_STYLES = {
+  danger: "border-t border-l-4 border-l-rose-400 border-t-rose-100 bg-rose-50/80",
+  success:
+    "border-t border-l-4 border-l-emerald-400 border-t-emerald-100 bg-emerald-50/80",
+  warning:
+    "border-t border-l-4 border-l-amber-400 border-t-amber-100 bg-amber-50/80",
+  info: "border-t border-l-4 border-l-sky-300 border-t-sky-100 bg-sky-50/70",
+  neutral: "border-t border-slate-200",
+};
 
 function buildEditState(detail) {
   return {
@@ -75,6 +87,134 @@ function DetailCard({ actions, children, title }) {
       <div className="mt-4">{children}</div>
     </div>
   );
+}
+
+function formatLogActor(log, viewerRole) {
+  if (viewerRole === ROLE.ADMIN) {
+    return {
+      name: log.actor_email || "system",
+      role: log.actor_role || null,
+    };
+  }
+
+  if (log.actor_role === ROLE.ADMIN) {
+    return {
+      name: "Meblofix",
+      role: null,
+    };
+  }
+
+  if (log.actor_role === "public") {
+    return {
+      name: "Link SMS klienta",
+      role: null,
+    };
+  }
+
+  if (log.actor_role === ROLE.USER) {
+    return {
+      name: log.actor_email || "Uzytkownik",
+      role: null,
+    };
+  }
+
+  return {
+    name: log.actor_email || "System",
+    role: null,
+  };
+}
+
+function formatTooltipDatePart(date) {
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Europe/Warsaw",
+  }).format(date);
+}
+
+function formatTooltipTimePart(date) {
+  return new Intl.DateTimeFormat("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Warsaw",
+  }).format(date);
+}
+
+function formatSmsTooltipWindow(routeStop, reklamacja) {
+  const etaFrom = routeStop?.eta_from || routeStop?.etaFrom || null;
+  const etaTo = routeStop?.eta_to || routeStop?.etaTo || null;
+
+  if (etaFrom) {
+    const fromDate = new Date(etaFrom);
+
+    if (!Number.isNaN(fromDate.getTime())) {
+      const fromDatePart = formatTooltipDatePart(fromDate);
+      const fromTime = formatTooltipTimePart(fromDate);
+
+      if (!etaTo) {
+        return `${fromDatePart} ${fromTime}`;
+      }
+
+      const toDate = new Date(etaTo);
+      if (Number.isNaN(toDate.getTime())) {
+        return `${fromDatePart} ${fromTime}`;
+      }
+
+      const toDatePart = formatTooltipDatePart(toDate);
+      const toTime = formatTooltipTimePart(toDate);
+
+      if (toDatePart !== fromDatePart) {
+        return `${fromDatePart} ${fromTime}-${toDatePart} ${toTime}`;
+      }
+
+      return `${fromDatePart} ${fromTime}-${toTime}`;
+    }
+  }
+
+  const fallbackDate = formatDate(reklamacja?.realizacja_do, true);
+  return fallbackDate === "-" ? "" : fallbackDate;
+}
+
+function buildSmsConfirmationDisplay(reklamacja, routeStop, status) {
+  const activeStatus = status || SMS_CONFIRMATION_STATUS.NOT_SENT;
+  const windowLabel = formatSmsTooltipWindow(routeStop, reklamacja);
+  const termSuffix = windowLabel ? ` ${windowLabel}` : "";
+
+  if (!routeStop || activeStatus === SMS_CONFIRMATION_STATUS.NOT_SENT) {
+    return {
+      status: SMS_CONFIRMATION_STATUS.NOT_SENT,
+      tooltipLabel:
+        "Termin realizacji nie został jeszcze zaproponowany klientowi - reklamacja oczekuje na zaplanowanie do trasy",
+    };
+  }
+
+  if (activeStatus === SMS_CONFIRMATION_STATUS.CONFIRMED) {
+    return {
+      status: SMS_CONFIRMATION_STATUS.CONFIRMED,
+      tooltipLabel: `Klient potwierdził termin${termSuffix}`,
+    };
+  }
+
+  if (activeStatus === SMS_CONFIRMATION_STATUS.MANUAL_REJECTED) {
+    return {
+      status: SMS_CONFIRMATION_STATUS.SENT,
+      tooltipLabel: `Klient odrzucił proponowany termin${termSuffix}`,
+    };
+  }
+
+  if (activeStatus === SMS_CONFIRMATION_STATUS.SENT) {
+    return {
+      status: SMS_CONFIRMATION_STATUS.SENT,
+      tooltipLabel: `Meblofix zaproponował klientowi termin${termSuffix}. Oczekuje na potwierdzenie`,
+    };
+  }
+
+  return {
+    status: activeStatus,
+    tooltipLabel: "",
+  };
 }
 
 const EMPTY_PENDING_USER_CHANGES = {
@@ -165,6 +305,11 @@ export default function ReklamacjaDetailPage() {
   const routeStopSmsStatus =
     detail?.routeStop?.smsConfirmationStatus ||
     detail?.routeStop?.sms_potwierdzenie_status;
+  const smsConfirmationDisplay = buildSmsConfirmationDisplay(
+    detail?.reklamacja,
+    detail?.routeStop,
+    routeStopSmsStatus
+  );
   const routeStopStatus = detail?.routeStop?.status || null;
   const pendingUserChanges =
     detail?.pendingUserChanges || EMPTY_PENDING_USER_CHANGES;
@@ -468,17 +613,16 @@ export default function ReklamacjaDetailPage() {
                       <div className="mt-1">
                         Termin: {formatDate(detail.reklamacja.realizacja_do, true)}
                       </div>
-                      {detail.routeStop ? (
-                        <div className="mt-3 border-t border-slate-200 pt-3">
-                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Potwierdzenie SMS
-                          </div>
-                          <RouteSmsStatusControl
-                            status={routeStopSmsStatus}
-                            readOnly
-                          />
+                      <div className="mt-3 border-t border-slate-200 pt-3">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Potwierdzenie SMS
                         </div>
-                      ) : null}
+                        <RouteSmsStatusControl
+                          status={smsConfirmationDisplay.status}
+                          readOnly
+                          tooltipLabel={smsConfirmationDisplay.tooltipLabel}
+                        />
+                      </div>
                     </div>
                     {profile.role === ROLE.ADMIN ? (
                       <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -967,45 +1111,51 @@ export default function ReklamacjaDetailPage() {
                 ) : null}
               </DetailCard>
 
-              {showAdminSections ? (
-                <DetailCard title="Historia dzialan">
-                  {detail.logs.length ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead className="text-left text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2">Data</th>
-                            <th className="px-3 py-2">Akcja</th>
-                            <th className="px-3 py-2">Kto</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detail.logs.map((log) => (
-                            <tr key={log.id} className="border-t border-slate-200">
+              <DetailCard title="Historia dzialan">
+                {detail.logs.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="text-left text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2">Data</th>
+                          <th className="px-3 py-2">Akcja</th>
+                          <th className="px-3 py-2">Kto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.logs.map((log) => {
+                          const actor = formatLogActor(log, profile?.role);
+                          const rowStyle =
+                            OPERATIONAL_LOG_ROW_STYLES[
+                              getOperationalLogTone(log)
+                            ] || OPERATIONAL_LOG_ROW_STYLES.neutral;
+
+                          return (
+                            <tr key={log.id} className={cn(rowStyle)}>
                               <td className="px-3 py-3">
                                 {formatDate(log.created_at, true)}
                               </td>
                               <td className="px-3 py-3">
-                                {labelForOperationalAction(log.action)}
+                                {formatOperationalLogAction(log)}
                               </td>
                               <td className="px-3 py-3">
-                                {log.actor_email || "system"}
-                                {log.actor_role ? (
+                                {actor.name}
+                                {actor.role ? (
                                   <span className="ml-2 text-xs text-slate-500">
-                                    ({log.actor_role})
+                                    ({actor.role})
                                   </span>
                                 ) : null}
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-slate-500">Brak logow dla tej reklamacji.</p>
-                  )}
-                </DetailCard>
-              ) : null}
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-slate-500">Brak logow dla tej reklamacji.</p>
+                )}
+              </DetailCard>
             </section>
 
             {hasAsideContent ? (

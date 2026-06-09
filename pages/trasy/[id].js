@@ -16,12 +16,14 @@ import {
 import { apiFetch } from "@/lib/client-api";
 import { useCurrentProfile } from "@/lib/use-current-profile";
 import {
+  cn,
   formatDate,
   formatDistance,
   formatDuration,
+  formatOperationalLogAction,
+  getOperationalLogTone,
   getRouteDisplayName,
   labelForStatus,
-  labelForOperationalAction,
   safeArray,
 } from "@/lib/utils";
 import Link from "next/link";
@@ -31,6 +33,16 @@ import { useEffect, useMemo, useState } from "react";
 const RouteMap = dynamic(() => import("@/components/maps/RouteMap"), {
   ssr: false,
 });
+
+const OPERATIONAL_LOG_ROW_STYLES = {
+  danger: "border-t border-l-4 border-l-rose-400 border-t-rose-100 bg-rose-50/80",
+  success:
+    "border-t border-l-4 border-l-emerald-400 border-t-emerald-100 bg-emerald-50/80",
+  warning:
+    "border-t border-l-4 border-l-amber-400 border-t-amber-100 bg-amber-50/80",
+  info: "border-t border-l-4 border-l-sky-300 border-t-sky-100 bg-sky-50/70",
+  neutral: "border-t border-slate-200",
+};
 
 function toDateTimeLocalValue(value) {
   if (!value) {
@@ -928,24 +940,31 @@ export default function RouteDetailPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {detail.logs.map((log) => (
-                          <tr key={log.id} className="border-t border-slate-200">
-                            <td className="px-3 py-3">
-                              {formatDate(log.created_at, true)}
-                            </td>
-                            <td className="px-3 py-3">
-                              {labelForOperationalAction(log.action)}
-                            </td>
-                            <td className="px-3 py-3">
-                              {log.actor_email || "system"}
-                              {log.actor_role ? (
-                                <span className="ml-2 text-xs text-slate-500">
-                                  ({log.actor_role})
-                                </span>
-                              ) : null}
-                            </td>
-                          </tr>
-                        ))}
+                        {detail.logs.map((log) => {
+                          const rowStyle =
+                            OPERATIONAL_LOG_ROW_STYLES[
+                              getOperationalLogTone(log)
+                            ] || OPERATIONAL_LOG_ROW_STYLES.neutral;
+
+                          return (
+                            <tr key={log.id} className={cn(rowStyle)}>
+                              <td className="px-3 py-3">
+                                {formatDate(log.created_at, true)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {formatOperationalLogAction(log)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {log.actor_email || "system"}
+                                {log.actor_role ? (
+                                  <span className="ml-2 text-xs text-slate-500">
+                                    ({log.actor_role})
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

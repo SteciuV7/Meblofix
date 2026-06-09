@@ -44,6 +44,108 @@ const OPERATIONAL_LOG_ROW_STYLES = {
   neutral: "border-t border-slate-200",
 };
 
+const DELETE_ROUTE_CONFIRMATION_TEXT = "Usu\u0144 tras\u0119";
+
+function DeleteRouteConfirmModal({
+  isOpen,
+  loading = false,
+  pointCount = 0,
+  routeName = "Trasa",
+  onClose,
+  onConfirm,
+}) {
+  const [confirmationText, setConfirmationText] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setConfirmationText("");
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape" && !loading) {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, loading, onClose]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const canConfirm = confirmationText === DELETE_ROUTE_CONFIRMATION_TEXT;
+
+  return (
+    <div className="fixed inset-0 z-[1000] overflow-y-auto bg-slate-950/55 px-4 py-6">
+      <div className="mx-auto flex min-h-full max-w-xl items-center justify-center">
+        <div
+          className="w-full rounded-[2rem] border border-rose-200 bg-white p-6 shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-route-modal-title"
+        >
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">
+              Usuniecie trasy
+            </div>
+            <h2
+              id="delete-route-modal-title"
+              className="mt-2 text-2xl font-semibold text-slate-950"
+            >
+              Usun zaplanowana trase
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Trasa {routeName} zostanie anulowana i ukryta z domyslnej listy.
+              {pointCount ? ` ${pointCount} reklamacji wroci do stanu sprzed planowania.` : ""}
+              Potwierdzone terminy SMS pozostana bez zmian.
+            </p>
+          </div>
+
+          <label className="mt-6 block text-sm font-medium text-slate-700">
+            Wpisz {DELETE_ROUTE_CONFIRMATION_TEXT}, aby potwierdzic
+            <input
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
+              value={confirmationText}
+              disabled={loading}
+              onChange={(event) => setConfirmationText(event.target.value)}
+              placeholder={DELETE_ROUTE_CONFIRMATION_TEXT}
+            />
+          </label>
+
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="rounded-full bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anuluj
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={loading || !canConfirm}
+              className="rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Usuwanie..." : "Usun trase"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function toDateTimeLocalValue(value) {
   if (!value) {
     return "";
@@ -94,6 +196,7 @@ export default function RouteDetailPage() {
   const [editPreviewLoading, setEditPreviewLoading] = useState(false);
   const [editPreviewError, setEditPreviewError] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [deleteRouteModalOpen, setDeleteRouteModalOpen] = useState(false);
 
   useEffect(() => {
     if (error) {
@@ -302,6 +405,8 @@ export default function RouteDetailPage() {
     detail?.route?.status === ROUTE_STATUS.PLANNED &&
     !isEditingRoute &&
     pendingBatchConfirmationStopsCount > 0;
+  const canCancelRoute =
+    detail?.route?.status === ROUTE_STATUS.PLANNED && !isEditingRoute && !saving;
   const displayStops = isEditingRoute ? editingPreviewStops : orderedStops;
   const routeStartBaseAddress =
     (isEditingRoute
@@ -616,6 +721,22 @@ export default function RouteDetailPage() {
     }
   }
 
+  async function handleDeleteRouteConfirm() {
+    try {
+      setSaving(true);
+      await apiFetch(`/api/trasy/${id}`, { method: "DELETE" });
+      setDeleteRouteModalOpen(false);
+      router.push("/trasy");
+    } catch (err) {
+      setDeleteRouteModalOpen(false);
+      setFeedback(
+        buildFeedback("error", err.message || "Nie udalo sie usunac trasy.")
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">
@@ -659,6 +780,19 @@ export default function RouteDetailPage() {
                 onClick={handleEnableEditing}
               >
                 Edytuj trase
+              </button>
+            ) : null}
+            {canCancelRoute ? (
+              <button
+                type="button"
+                className="rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  setFeedback(null);
+                  setDeleteRouteModalOpen(true);
+                }}
+                disabled={saving}
+              >
+                Usun trase
               </button>
             ) : null}
             {isEditingRoute ? (
@@ -1045,6 +1179,19 @@ export default function RouteDetailPage() {
           }
         }}
         onConfirm={handleRecalculateConfirm}
+      />
+
+      <DeleteRouteConfirmModal
+        isOpen={deleteRouteModalOpen}
+        routeName={getRouteDisplayName(detail?.route)}
+        pointCount={detail?.stops?.length || 0}
+        loading={saving}
+        onClose={() => {
+          if (!saving) {
+            setDeleteRouteModalOpen(false);
+          }
+        }}
+        onConfirm={handleDeleteRouteConfirm}
       />
     </>
   );

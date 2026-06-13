@@ -3,6 +3,7 @@ import PickedUpIndicator from "@/components/PickedUpIndicator";
 import { ScreenState } from "@/components/layout/ScreenState";
 import { StatusBadge } from "@/components/StatusBadge";
 import ComplaintAcceptModal from "@/components/reklamacje/ComplaintAcceptModal";
+import ComplaintAddressPreviewModal from "@/components/reklamacje/ComplaintAddressPreviewModal";
 import ComplaintChangesAcknowledgeModal from "@/components/reklamacje/ComplaintChangesAcknowledgeModal";
 import ComplaintCloseModal from "@/components/reklamacje/ComplaintCloseModal";
 import ImagePreviewModal from "@/components/reklamacje/ImagePreviewModal";
@@ -66,6 +67,18 @@ function buildEditState(detail) {
       ? new Date(detail.reklamacja.realizacja_do).toISOString().slice(0, 16)
       : "",
   };
+}
+
+function buildRequestedAddress(form) {
+  return {
+    addressLine: form.adres,
+    postalCode: form.kod_pocztowy,
+    town: form.miejscowosc,
+  };
+}
+
+function normalizeAddressPart(value) {
+  return String(value || "").trim();
 }
 
 function hasCompletionData(reklamacja) {
@@ -233,6 +246,8 @@ export default function ReklamacjaDetailPage() {
   const [editFurnitureError, setEditFurnitureError] = useState("");
   const [editReporterInfoError, setEditReporterInfoError] = useState("");
   const [editDeadlineError, setEditDeadlineError] = useState("");
+  const [addressPreview, setAddressPreview] = useState(null);
+  const [previewingAddress, setPreviewingAddress] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [changesModalDismissedForId, setChangesModalDismissedForId] =
     useState(null);
@@ -276,6 +291,24 @@ export default function ReklamacjaDetailPage() {
   useEffect(() => {
     setChangesModalDismissedForId(null);
   }, [id]);
+
+  useEffect(() => {
+    if (!addressPreview || saving) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setAddressPreview(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [addressPreview, saving]);
 
   const images = useMemo(
     () => safeArray(detail?.reklamacja?.zalacznik_zdjecia),
@@ -379,7 +412,7 @@ export default function ReklamacjaDetailPage() {
     }
   }
 
-  async function handleSave() {
+  function validateEditState() {
     const nazwaMebla = editState.nazwa_mebla.trim();
     let hasErrors = false;
 
@@ -409,20 +442,110 @@ export default function ReklamacjaDetailPage() {
       setEditDeadlineError("");
     }
 
-    if (hasErrors) {
-      return;
-    }
+    return !hasErrors;
+  }
 
-    const success = await update("update", {
+  function buildEditPayload(extra = {}) {
+    return {
       ...editState,
+      ...extra,
       realizacja_do: editState.realizacja_do
         ? new Date(editState.realizacja_do).toISOString()
         : null,
-    });
+    };
+  }
+
+  function hasAddressChanged() {
+    const reklamacja = detail?.reklamacja || {};
+
+    return (
+      normalizeAddressPart(editState.adres) !==
+        normalizeAddressPart(reklamacja.adres) ||
+      normalizeAddressPart(editState.miejscowosc) !==
+        normalizeAddressPart(reklamacja.miejscowosc) ||
+      normalizeAddressPart(editState.kod_pocztowy) !==
+        normalizeAddressPart(reklamacja.kod_pocztowy)
+    );
+  }
+
+  async function saveEditPayload(payload, { showAlert = true } = {}) {
+    try {
+      setSaving(true);
+      await apiFetch(`/api/reklamacje/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "update", payload }),
+      });
+      await refresh();
+      setIsEditing(false);
+      return true;
+    } catch (err) {
+      if (showAlert) {
+        alert(err.message || "Nie udalo sie wykonac operacji.");
+      }
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!validateEditState()) {
+      return;
+    }
+
+    if (!hasAddressChanged()) {
+      await saveEditPayload(buildEditPayload());
+      return;
+    }
+
+    try {
+      setPreviewingAddress(true);
+      const preview = await apiFetch("/api/reklamacje/geocode-preview", {
+        method: "POST",
+        body: JSON.stringify(buildEditPayload()),
+      });
+
+      setAddressPreview({
+        ...preview,
+        kind: "geocode",
+        submitError: "",
+      });
+    } catch (err) {
+      setAddressPreview({
+        kind: "error",
+        requestedAddress: buildRequestedAddress(editState),
+        message: err.message || "Nie udalo sie sprawdzic adresu.",
+      });
+    } finally {
+      setPreviewingAddress(false);
+    }
+  }
+
+  async function handleConfirmAddress() {
+    if (!addressPreview || !validateEditState()) {
+      return;
+    }
+
+    const success = await saveEditPayload(
+      buildEditPayload({
+        addressApprovalMode: addressPreview.geocode?.matchType || "exact",
+      }),
+      { showAlert: false }
+    );
 
     if (success) {
-      setIsEditing(false);
+      setAddressPreview(null);
+      return;
     }
+
+    setAddressPreview((current) =>
+      current
+        ? {
+            ...current,
+            submitError: "Nie udalo sie zapisac zmian reklamacji.",
+          }
+        : current
+    );
   }
 
   async function handleCloseSubmit(payload) {
@@ -455,6 +578,7 @@ export default function ReklamacjaDetailPage() {
       setEditFurnitureError("");
       setEditReporterInfoError("");
       setEditDeadlineError("");
+      setAddressPreview(null);
       setIsEditing(false);
       return;
     }
@@ -462,6 +586,7 @@ export default function ReklamacjaDetailPage() {
     setEditFurnitureError("");
     setEditReporterInfoError("");
     setEditDeadlineError("");
+    setAddressPreview(null);
     setIsEditing(true);
   }
 
@@ -828,12 +953,13 @@ export default function ReklamacjaDetailPage() {
                       value={editState.kod_pocztowy}
                       placeholder="Kod pocztowy (XX-XXX)"
                       disabled={userAddressEditBlocked}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        setAddressPreview(null);
                         setEditState((current) => ({
                           ...current,
                           kod_pocztowy: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
                   </label>
                   <label className="text-sm text-slate-700">
@@ -843,12 +969,13 @@ export default function ReklamacjaDetailPage() {
                       value={editState.miejscowosc}
                       placeholder="Miasto"
                       disabled={userAddressEditBlocked}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        setAddressPreview(null);
                         setEditState((current) => ({
                           ...current,
                           miejscowosc: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
                   </label>
                   <label className="text-sm text-slate-700 md:col-span-2">
@@ -858,12 +985,13 @@ export default function ReklamacjaDetailPage() {
                       value={editState.adres}
                       placeholder="Nazwa ulicy + numer"
                       disabled={userAddressEditBlocked}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        setAddressPreview(null);
                         setEditState((current) => ({
                           ...current,
                           adres: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
                     {userAddressEditBlocked ? (
                       <div className="mt-2 text-xs text-slate-500">
@@ -929,9 +1057,13 @@ export default function ReklamacjaDetailPage() {
                       type="button"
                       className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
                       onClick={handleSave}
-                      disabled={saving}
+                      disabled={saving || previewingAddress}
                     >
-                      {saving ? "Zapisywanie..." : "Zapisz zmiany"}
+                      {previewingAddress
+                        ? "Sprawdzam adres..."
+                        : saving
+                          ? "Zapisywanie..."
+                          : "Zapisz zmiany"}
                     </button>
                   </div>
                 ) : null}
@@ -1206,6 +1338,18 @@ export default function ReklamacjaDetailPage() {
           </div>
         )}
       </AppShell>
+
+      <ComplaintAddressPreviewModal
+        preview={addressPreview}
+        profile={profile}
+        submitting={saving}
+        onClose={() => {
+          if (!saving) {
+            setAddressPreview(null);
+          }
+        }}
+        onConfirm={handleConfirmAddress}
+      />
 
       <ComplaintCloseModal
         isOpen={Boolean(closeModalMode && detail?.reklamacja)}

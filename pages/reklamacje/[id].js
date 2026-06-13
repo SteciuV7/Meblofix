@@ -477,12 +477,13 @@ export default function ReklamacjaDetailPage() {
       });
       await refresh();
       setIsEditing(false);
-      return true;
+      return { ok: true };
     } catch (err) {
+      const message = err.message || "Nie udalo sie wykonac operacji.";
       if (showAlert) {
-        alert(err.message || "Nie udalo sie wykonac operacji.");
+        alert(message);
       }
-      return false;
+      return { ok: false, message };
     } finally {
       setSaving(false);
     }
@@ -526,14 +527,15 @@ export default function ReklamacjaDetailPage() {
       return;
     }
 
-    const success = await saveEditPayload(
+    const result = await saveEditPayload(
       buildEditPayload({
         addressApprovalMode: addressPreview.geocode?.matchType || "exact",
+        addressGeocode: addressPreview.geocode || null,
       }),
       { showAlert: false }
     );
 
-    if (success) {
+    if (result.ok) {
       setAddressPreview(null);
       return;
     }
@@ -542,7 +544,7 @@ export default function ReklamacjaDetailPage() {
       current
         ? {
             ...current,
-            submitError: "Nie udalo sie zapisac zmian reklamacji.",
+            submitError: result.message || "Nie udalo sie zapisac zmian reklamacji.",
           }
         : current
     );

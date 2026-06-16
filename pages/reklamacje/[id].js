@@ -39,6 +39,14 @@ import { useEffect, useMemo, useState } from "react";
 
 const MAX_FURNITURE_NAME_LENGTH = 15;
 
+function toDateInputValue(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 10);
+}
+
 const OPERATIONAL_LOG_ROW_STYLES = {
   danger: "border-t border-l-4 border-l-rose-400 border-t-rose-100 bg-rose-50/80",
   success:
@@ -155,7 +163,7 @@ function formatTooltipTimePart(date) {
   }).format(date);
 }
 
-function formatSmsTooltipWindow(routeStop, reklamacja) {
+function formatSmsTooltipWindow(routeStop, reklamacja, withTime = true) {
   const etaFrom = routeStop?.eta_from || routeStop?.etaFrom || null;
   const etaTo = routeStop?.eta_to || routeStop?.etaTo || null;
 
@@ -164,6 +172,23 @@ function formatSmsTooltipWindow(routeStop, reklamacja) {
 
     if (!Number.isNaN(fromDate.getTime())) {
       const fromDatePart = formatTooltipDatePart(fromDate);
+
+      if (!withTime) {
+        if (!etaTo) {
+          return fromDatePart;
+        }
+
+        const toDate = new Date(etaTo);
+        if (Number.isNaN(toDate.getTime())) {
+          return fromDatePart;
+        }
+
+        const toDatePart = formatTooltipDatePart(toDate);
+        return toDatePart !== fromDatePart
+          ? `${fromDatePart}-${toDatePart}`
+          : fromDatePart;
+      }
+
       const fromTime = formatTooltipTimePart(fromDate);
 
       if (!etaTo) {
@@ -186,13 +211,13 @@ function formatSmsTooltipWindow(routeStop, reklamacja) {
     }
   }
 
-  const fallbackDate = formatDate(reklamacja?.realizacja_do, true);
+  const fallbackDate = formatDate(reklamacja?.realizacja_do, withTime);
   return fallbackDate === "-" ? "" : fallbackDate;
 }
 
-function buildSmsConfirmationDisplay(reklamacja, routeStop, status) {
+function buildSmsConfirmationDisplay(reklamacja, routeStop, status, withTime = true) {
   const activeStatus = status || SMS_CONFIRMATION_STATUS.NOT_SENT;
-  const windowLabel = formatSmsTooltipWindow(routeStop, reklamacja);
+  const windowLabel = formatSmsTooltipWindow(routeStop, reklamacja, withTime);
   const termSuffix = windowLabel ? ` ${windowLabel}` : "";
 
   if (!routeStop || activeStatus === SMS_CONFIRMATION_STATUS.NOT_SENT) {
@@ -335,13 +360,15 @@ export default function ReklamacjaDetailPage() {
     detail?.reklamacja?.numer_faktury ||
     detail?.reklamacja?.nr_reklamacji ||
     "-";
+  const showServiceTimes = profile?.role === ROLE.ADMIN;
   const routeStopSmsStatus =
     detail?.routeStop?.smsConfirmationStatus ||
     detail?.routeStop?.sms_potwierdzenie_status;
   const smsConfirmationDisplay = buildSmsConfirmationDisplay(
     detail?.reklamacja,
     detail?.routeStop,
-    routeStopSmsStatus
+    routeStopSmsStatus,
+    showServiceTimes
   );
   const routeStopStatus = detail?.routeStop?.status || null;
   const pendingUserChanges =
@@ -736,9 +763,19 @@ export default function ReklamacjaDetailPage() {
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      <div>Dodano: {formatDate(detail.reklamacja.data_zgloszenia, true)}</div>
+                      <div>
+                        Dodano:{" "}
+                        {formatDate(
+                          detail.reklamacja.data_zgloszenia,
+                          showServiceTimes
+                        )}
+                      </div>
                       <div className="mt-1">
-                        Termin: {formatDate(detail.reklamacja.realizacja_do, true)}
+                        Termin:{" "}
+                        {formatDate(
+                          detail.reklamacja.realizacja_do,
+                          showServiceTimes
+                        )}
                       </div>
                       <div className="mt-3 border-t border-slate-200 pt-3">
                         <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -931,9 +968,13 @@ export default function ReklamacjaDetailPage() {
                   <label className="text-sm text-slate-700">
                     Termin realizacji
                     <input
-                      type="datetime-local"
+                      type={showServiceTimes ? "datetime-local" : "date"}
                       className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
-                      value={editState.realizacja_do}
+                      value={
+                        showServiceTimes
+                          ? editState.realizacja_do
+                          : toDateInputValue(editState.realizacja_do)
+                      }
                       onChange={(event) => {
                         setEditDeadlineError("");
                         setEditState((current) => ({
@@ -1171,7 +1212,10 @@ export default function ReklamacjaDetailPage() {
                       <div>
                         Data zakonczenia:{" "}
                         <span className="font-semibold text-slate-900">
-                          {formatDate(detail.reklamacja.data_zakonczenia, true)}
+                          {formatDate(
+                            detail.reklamacja.data_zakonczenia,
+                            showServiceTimes
+                          )}
                         </span>
                       </div>
                     </div>
@@ -1267,10 +1311,12 @@ export default function ReklamacjaDetailPage() {
                           return (
                             <tr key={log.id} className={cn(rowStyle)}>
                               <td className="px-3 py-3">
-                                {formatDate(log.created_at, true)}
+                                {formatDate(log.created_at, showServiceTimes)}
                               </td>
                               <td className="px-3 py-3">
-                                {formatOperationalLogAction(log)}
+                                {formatOperationalLogAction(log, {
+                                  withTime: showServiceTimes,
+                                })}
                               </td>
                               <td className="px-3 py-3">
                                 {actor.name}

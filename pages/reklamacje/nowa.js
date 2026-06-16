@@ -21,6 +21,14 @@ import { useEffect, useState } from "react";
 const IMAGE_SLOT_COUNT = 4;
 const MAX_FURNITURE_NAME_LENGTH = 15;
 
+function toDateInputValue(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 10);
+}
+
 function emptyForm() {
   return {
     firma_id: "",
@@ -567,6 +575,8 @@ export default function NewReklamacjaPage() {
     return null;
   }
 
+  const showServiceTimes = profile.role === ROLE.ADMIN;
+
   return (
     <>
       <AppShell
@@ -799,9 +809,13 @@ export default function NewReklamacjaPage() {
             <label className="block text-sm text-slate-700">
               Termin realizacji
               <input
-                type="datetime-local"
+                type={showServiceTimes ? "datetime-local" : "date"}
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
-                value={form.realizacja_do}
+                value={
+                  showServiceTimes
+                    ? form.realizacja_do
+                    : toDateInputValue(form.realizacja_do)
+                }
                 onChange={(event) => {
                   setDeadlineError("");
                   setForm((current) => ({

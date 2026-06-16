@@ -87,7 +87,7 @@ export default function ComplaintChangesAcknowledgeModal({
                       {event.actionLabel}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {formatDate(event.date, true)} | {event.source}
+                      {formatDate(event.date)} | {event.source}
                     </div>
                   </div>
 
